@@ -20,6 +20,36 @@ export const DEFAULT_WIKI_INDEX_TITLE = 'LLM-Wiki-Index'
 export const DEFAULT_WIKI_LOG_TITLE = 'LLM-Wiki-Maintenance-Log'
 export const DEFAULT_WIKI_CONTAINER_PATH = '/知识库/LLM Wiki'
 
+export const WIKI_GENERATION_MODES = ['compressed', 'full'] as const
+export type WikiGenerationMode = typeof WIKI_GENERATION_MODES[number]
+
+export const WIKI_SOURCE_CITATION_MODES = ['inline', 'section', 'both'] as const
+export type WikiSourceCitationMode = typeof WIKI_SOURCE_CITATION_MODES[number]
+
+export const CURRENT_WIKI_PROMPT_VERSION = 1
+
+export const DEFAULT_WIKI_MAINTENANCE_PROMPT = [
+  '你是思源笔记的 Wiki 维护助手。基于提供的源文档证据块生成主题 Wiki 页面。',
+  '',
+  '## 核心原则',
+  '1. 每个关键结论必须绑定至少一个源文档作为证据来源',
+  '2. 区分事实、推断和待验证内容，用 [✓] [~] [?] [+] 标记',
+  '3. 优先提取对用户个人有启发价值的具体内容，避免通用总结',
+  '4. 证据不足时标注 [待补充] 而非编造内容',
+  '',
+  '## 内容要求',
+  '- 主题概览：用 3-5 句话概括该主题下的知识现状，指出核心发现和主要空白',
+  '- 关键文档：列出最有价值的文档，说明每篇的独特贡献',
+  '- 核心原则：从文档中提炼可复用的方法论、原则或框架',
+  '- 关系证据：说明文档之间的引用关系、互补关系或矛盾关系',
+  '- 待解问题：列出当前资料尚未回答的问题',
+  '- 下一步行动：基于当前知识状态建议的具体行动',
+  '',
+  '## 输出格式',
+  '- 每个段落绑定来源引用：<sup>((文档ID "序号"))</sup>',
+  '- 可靠性标记：[✓]来源支持 [~]合理推断 [?]待验证 [+] AI补充',
+].join('\n')
+
 export interface PluginConfig {
   showSummaryCards: boolean
   showDocuments?: boolean
@@ -67,6 +97,11 @@ export interface PluginConfig {
   wikiLogTitle?: string
   wikiContainerPath?: string
   wikiIncrementalEnabled?: boolean
+  wikiGenerationMode?: WikiGenerationMode
+  wikiMaintenancePrompt?: string
+  wikiMaintenancePromptVersion?: number
+  wikiHallucinationMarkingEnabled?: boolean
+  wikiSourceCitationMode?: WikiSourceCitationMode
   summaryCardOrder?: string[]
 }
 
@@ -105,6 +140,11 @@ export const DEFAULT_CONFIG: PluginConfig = {
   wikiLogTitle: DEFAULT_WIKI_LOG_TITLE,
   wikiContainerPath: DEFAULT_WIKI_CONTAINER_PATH,
   wikiIncrementalEnabled: true,
+  wikiGenerationMode: 'full',
+  wikiMaintenancePrompt: DEFAULT_WIKI_MAINTENANCE_PROMPT,
+  wikiMaintenancePromptVersion: CURRENT_WIKI_PROMPT_VERSION,
+  wikiHallucinationMarkingEnabled: true,
+  wikiSourceCitationMode: 'inline',
   summaryCardOrder: undefined,
 }
 
@@ -232,6 +272,22 @@ export function ensureConfigDefaults(config: PluginConfig) {
   )
   if (typeof config.wikiIncrementalEnabled !== 'boolean') {
     config.wikiIncrementalEnabled = true
+  }
+  if (typeof config.wikiGenerationMode !== 'string' || !WIKI_GENERATION_MODES.includes(config.wikiGenerationMode as WikiGenerationMode)) {
+    config.wikiGenerationMode = 'full'
+  }
+  if (typeof config.wikiMaintenancePrompt !== 'string' || !config.wikiMaintenancePrompt.trim()) {
+    config.wikiMaintenancePrompt = DEFAULT_WIKI_MAINTENANCE_PROMPT
+    config.wikiMaintenancePromptVersion = CURRENT_WIKI_PROMPT_VERSION
+  }
+  if (typeof config.wikiMaintenancePromptVersion !== 'number') {
+    config.wikiMaintenancePromptVersion = 0
+  }
+  if (typeof config.wikiHallucinationMarkingEnabled !== 'boolean') {
+    config.wikiHallucinationMarkingEnabled = true
+  }
+  if (typeof config.wikiSourceCitationMode !== 'string' || !WIKI_SOURCE_CITATION_MODES.includes(config.wikiSourceCitationMode as WikiSourceCitationMode)) {
+    config.wikiSourceCitationMode = 'inline'
   }
   ensureAiProviderConfigState(config)
 }

@@ -170,6 +170,10 @@ describe('wiki generation', () => {
             secondarySourceBlocks: [
               { blockId: 'blk-3', text: 'AI 核心延伸说明' },
             ] satisfies SourceBlockItem[],
+            sourceBlockTexts: [
+              'AI 核心定义段落',
+              'AI 核心延伸说明',
+            ] satisfies string[],
             sourceUpdatedAt: '20260311120000',
             generatedAt: '2026-04-09T12:00:00.000Z',
           },
@@ -186,6 +190,10 @@ describe('wiki generation', () => {
               { blockId: 'blk-4', text: '桥接页中的应用说明' },
             ] satisfies SourceBlockItem[],
             secondarySourceBlocks: [] satisfies SourceBlockItem[],
+            sourceBlockTexts: [
+              '桥接页中的引用证据',
+              '桥接页中的应用说明',
+            ] satisfies string[],
             sourceUpdatedAt: '20260312120000',
             generatedAt: '2026-04-09T13:00:00.000Z',
           },

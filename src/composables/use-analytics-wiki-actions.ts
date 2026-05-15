@@ -521,7 +521,7 @@ export function createAnalyticsWikiActionsController(params: {
 }
 
 function buildSingleThemeWikiPayload(params: {
-  config: Pick<PluginConfig, 'wikiPageSuffix'>
+  config: Pick<PluginConfig, 'wikiPageSuffix' | 'wikiGenerationMode'>
   themeDocument: { documentId: string, title: string, themeName: string }
   sourceDocuments: DocumentRecord[]
   report: ReferenceGraphReport
@@ -530,11 +530,27 @@ function buildSingleThemeWikiPayload(params: {
   getDocumentProfile: (document: DocumentRecord) => DocumentIndexProfile | null
   deltaMap?: Map<string, 'new' | 'changed' | 'unchanged' | 'deleted'>
 }): WikiThemeBundle {
+  const generationMode = params.config.wikiGenerationMode ?? 'full'
+
   const bundleDocuments = params.sourceDocuments.map((document) => {
     const profile = params.getDocumentProfile(document)
     if (!profile) {
       throw new Error(`Missing document index profile for wiki source document: ${document.id}`)
     }
+
+    const primaryBlocks = parseJsonArray<any>(profile.primarySourceBlocksJson)
+      .filter((item): item is { blockId: string, text: string } => Boolean(item) && typeof item.blockId === 'string' && typeof item.text === 'string')
+      .map(item => ({ blockId: item.blockId.trim(), text: item.text.trim() }))
+      .filter(item => item.blockId.length > 0 && item.text.length > 0)
+
+    const secondaryBlocks = parseJsonArray<any>(profile.secondarySourceBlocksJson)
+      .filter((item): item is { blockId: string, text: string } => Boolean(item) && typeof item.blockId === 'string' && typeof item.text === 'string')
+      .map(item => ({ blockId: item.blockId.trim(), text: item.text.trim() }))
+      .filter(item => item.blockId.length > 0 && item.text.length > 0)
+
+    const sourceBlockTexts = generationMode === 'full'
+      ? [...primaryBlocks.map(block => block.text), ...secondaryBlocks.map(block => block.text)]
+      : []
 
     return {
       documentId: document.id,
@@ -553,14 +569,9 @@ function buildSingleThemeWikiPayload(params: {
         .filter((item): item is string => typeof item === 'string')
         .map(item => item.trim())
         .filter(Boolean),
-      primarySourceBlocks: parseJsonArray<any>(profile.primarySourceBlocksJson)
-        .filter((item): item is { blockId: string, text: string } => Boolean(item) && typeof item.blockId === 'string' && typeof item.text === 'string')
-        .map(item => ({ blockId: item.blockId.trim(), text: item.text.trim() }))
-        .filter(item => item.blockId.length > 0 && item.text.length > 0),
-      secondarySourceBlocks: parseJsonArray<any>(profile.secondarySourceBlocksJson)
-        .filter((item): item is { blockId: string, text: string } => Boolean(item) && typeof item.blockId === 'string' && typeof item.text === 'string')
-        .map(item => ({ blockId: item.blockId.trim(), text: item.text.trim() }))
-        .filter(item => item.blockId.length > 0 && item.text.length > 0),
+      primarySourceBlocks: primaryBlocks,
+      secondarySourceBlocks: secondaryBlocks,
+      sourceBlockTexts,
       sourceUpdatedAt: profile.sourceUpdatedAt,
       generatedAt: profile.generatedAt,
       deltaStatus: params.deltaMap?.get(document.id) ?? 'new',

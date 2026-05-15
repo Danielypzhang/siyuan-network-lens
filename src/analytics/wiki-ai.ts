@@ -36,6 +36,10 @@ type AiConfig = Pick<
   | 'aiMaxTokens'
   | 'aiTemperature'
   | 'aiMaxContextMessages'
+  | 'wikiGenerationMode'
+  | 'wikiMaintenancePrompt'
+  | 'wikiHallucinationMarkingEnabled'
+  | 'wikiSourceCitationMode'
 >
 
 type ChatCompletionMessage = { role: 'system' | 'user' | 'assistant', content: string }
@@ -71,6 +75,103 @@ const BASE_SYSTEM_PROMPT = [
   'All user-visible text must follow the current workspace UI language.',
 ].join(' ')
 
+const FULL_MODE_PROMPT = [
+  'You have access to source document evidence blocks (sourceBlockTexts) — read them carefully.',
+  'Extract specific facts, data, examples, and arguments from the evidence blocks.',
+  'Cite the specific source document for each claim using sourceRefs with documentId.',
+  'Produce substantive content — 3 to 5 detailed points per section when evidence is sufficient.',
+  'Be specific and concrete. Avoid generic summaries.',
+].join(' ')
+
+const HALLUCINATION_MARKING_PROMPT = [
+  'Prefix every claim with a reliability tag on its own line:',
+  '[✓] — directly supported by source evidence blocks',
+  '[~] — reasonably inferred from multiple sources',
+  '[?] — speculative, needs human verification',
+  '[+] — AI supplementary suggestion, not from source documents',
+  'Use exactly one tag per claim. Place the tag at the start of the block text.',
+].join('\n')
+
+const SOURCE_CITATION_PROMPT = [
+  'Every block must include sourceRefs with the documentId values that support it.',
+  'When sourceRefs are empty, explicitly note the gap in the block text.',
+  'For the sources (catalog) section, each block must reference all relevant source documentIds.',
+].join(' ')
+
+function buildWikiSystemPrompt(config: AiConfig): string {
+  const parts = [BASE_SYSTEM_PROMPT]
+
+  if (config.wikiGenerationMode === 'full') {
+    parts.push(FULL_MODE_PROMPT)
+  }
+
+  if (config.wikiHallucinationMarkingEnabled !== false) {
+    parts.push(HALLUCINATION_MARKING_PROMPT)
+  }
+
+  if (config.wikiSourceCitationMode === 'inline' || config.wikiSourceCitationMode === 'both') {
+    parts.push(SOURCE_CITATION_PROMPT)
+  }
+
+  if (config.wikiMaintenancePrompt?.trim()) {
+    parts.push(config.wikiMaintenancePrompt.trim())
+  }
+
+  return parts.join('\n\n')
+}
+
+function buildWikiUserPayload(params: {
+  payload: WikiThemeBundle
+  diagnosis?: WikiTemplateDiagnosis
+  pagePlan?: WikiPagePlan
+  sectionType?: WikiSectionType
+  existingWikiContent?: string
+}): string {
+  const { payload, diagnosis, pagePlan, sectionType, existingWikiContent } = params
+
+  const bundleForAi: any = {
+    themeName: payload.themeName,
+    pageTitle: payload.pageTitle,
+    themeDocumentId: payload.themeDocumentId,
+    themeDocumentTitle: payload.themeDocumentTitle,
+    sourceDocuments: payload.sourceDocuments.map(doc => ({
+      documentId: doc.documentId,
+      title: doc.title,
+      positioning: doc.positioning,
+      propositions: doc.propositions,
+      keywords: doc.keywords,
+      ...(doc.sourceBlockTexts && doc.sourceBlockTexts.length > 0 ? { sourceBlockTexts: doc.sourceBlockTexts } : {}),
+    })),
+    templateSignals: payload.templateSignals,
+    analysisSignals: payload.analysisSignals,
+  }
+
+  const result: any = { payload: bundleForAi }
+
+  if (diagnosis) {
+    result.diagnosis = diagnosis
+  }
+  if (pagePlan) {
+    result.pagePlan = pagePlan
+  }
+  if (sectionType) {
+    result.sectionType = sectionType
+  }
+
+  let content = JSON.stringify(result)
+
+  if (existingWikiContent) {
+    content = [
+      t('analytics.wiki.incrementalModePrompt'),
+      `Existing wiki page content:\n${existingWikiContent}`,
+      '',
+      content,
+    ].join('\n')
+  }
+
+  return content
+}
+
 export function createAiWikiService(deps: {
   forwardProxy: ForwardProxyFn
 }): AiWikiService {
@@ -85,26 +186,20 @@ export function createAiWikiService(deps: {
           {
             role: 'system',
             content: [
-              BASE_SYSTEM_PROMPT,
+              buildWikiSystemPrompt(params.config),
               'Diagnose the best wiki template for the current theme.',
               'The JSON must include templateType, confidence, reason, enabledModules, suppressedModules, and evidenceSummary.',
             ].join(' '),
           },
           {
             role: 'user',
-            content: (() => {
-              const parts = [
-                t('analytics.wiki.diagnoseThemeTemplatePrompt', { theme: params.payload.themeName }),
-                t('analytics.wiki.diagnoseThemeTemplateSchemaPrompt'),
-                t('analytics.wiki.conservativeFallbackPrompt'),
-              ]
-              if (params.existingWikiContent) {
-                parts.push(t('analytics.wiki.incrementalModePrompt'))
-                parts.push(`Existing wiki page content:\n${params.existingWikiContent}`)
-              }
-              parts.push(JSON.stringify({ payload: params.payload }))
-              return parts.join('\n')
-            })(),
+            content: [
+              t('analytics.wiki.diagnoseThemeTemplatePrompt', { theme: params.payload.themeName }),
+              t('analytics.wiki.diagnoseThemeTemplateSchemaPrompt'),
+              t('analytics.wiki.conservativeFallbackPrompt'),
+              '',
+              buildWikiUserPayload({ payload: params.payload, existingWikiContent: params.existingWikiContent }),
+            ].join('\n'),
           },
         ],
       })
@@ -122,26 +217,20 @@ export function createAiWikiService(deps: {
           {
             role: 'system',
             content: [
-              BASE_SYSTEM_PROMPT,
+              buildWikiSystemPrompt(params.config),
               'Generate a wiki page plan for the diagnosed theme template.',
               'The JSON must include templateType, confidence, coreSections, optionalSections, sectionOrder, sectionGoals, and sectionFormats.',
             ].join(' '),
           },
           {
             role: 'user',
-            content: (() => {
-              const parts = [
-                t('analytics.wiki.planThemePagePrompt', { theme: params.payload.themeName }),
-                t('analytics.wiki.planThemePageSchemaPrompt'),
-                t('analytics.wiki.conservativeFallbackPrompt'),
-              ]
-              if (params.existingWikiContent) {
-                parts.push(t('analytics.wiki.incrementalModePrompt'))
-                parts.push(`Existing wiki page content:\n${params.existingWikiContent}`)
-              }
-              parts.push(JSON.stringify({ payload: params.payload, diagnosis: params.diagnosis }))
-              return parts.join('\n')
-            })(),
+            content: [
+              t('analytics.wiki.planThemePagePrompt', { theme: params.payload.themeName }),
+              t('analytics.wiki.planThemePageSchemaPrompt'),
+              t('analytics.wiki.conservativeFallbackPrompt'),
+              '',
+              buildWikiUserPayload({ payload: params.payload, diagnosis: params.diagnosis, existingWikiContent: params.existingWikiContent }),
+            ].join('\n'),
           },
         ],
       })
@@ -160,7 +249,7 @@ export function createAiWikiService(deps: {
             role: 'system',
             content: (() => {
               const parts = [
-                BASE_SYSTEM_PROMPT,
+                buildWikiSystemPrompt(params.config),
                 'Generate exactly one wiki section draft.',
                 'The JSON must include sectionType, title, format, blocks, and sourceRefs.',
                 'Each block must include text and sourceRefs.',
@@ -176,24 +265,19 @@ export function createAiWikiService(deps: {
           },
           {
             role: 'user',
-            content: (() => {
-              const parts = [
-                t('analytics.wiki.generateThemeSectionPrompt', { theme: params.payload.themeName, sectionType: params.sectionType }),
-                t('analytics.wiki.generateThemeSectionSchemaPrompt'),
-                t('analytics.wiki.conservativeFallbackPrompt'),
-              ]
-              if (params.existingWikiContent) {
-                parts.push(t('analytics.wiki.incrementalModePrompt'))
-                parts.push(`Existing wiki page content:\n${params.existingWikiContent}`)
-              }
-              parts.push(JSON.stringify({
+            content: [
+              t('analytics.wiki.generateThemeSectionPrompt', { theme: params.payload.themeName, sectionType: params.sectionType }),
+              t('analytics.wiki.generateThemeSectionSchemaPrompt'),
+              t('analytics.wiki.conservativeFallbackPrompt'),
+              '',
+              buildWikiUserPayload({
                 payload: params.payload,
                 diagnosis: params.diagnosis,
                 pagePlan: params.pagePlan,
                 sectionType: params.sectionType,
-              }))
-              return parts.join('\n')
-            })(),
+                existingWikiContent: params.existingWikiContent,
+              }),
+            ].join('\n'),
           },
         ],
       })

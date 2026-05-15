@@ -22,6 +22,7 @@ export interface WikiBundleDocumentItem {
   keywords: string[]
   primarySourceBlocks: SourceBlockItem[]
   secondarySourceBlocks: SourceBlockItem[]
+  sourceBlockTexts: string[]
   sourceUpdatedAt: string
   generatedAt: string
   deltaStatus?: WikiDeltaStatus
@@ -59,7 +60,7 @@ export interface WikiGenerationPayloadBundle {
 }
 
 export function buildWikiGenerationPayloads(params: {
-  config: Pick<PluginConfig, 'wikiPageSuffix'>
+  config: Pick<PluginConfig, 'wikiPageSuffix' | 'wikiGenerationMode'>
   scope: WikiScopeResult
   report: ReferenceGraphReport
   trends: TrendReport
@@ -67,11 +68,12 @@ export function buildWikiGenerationPayloads(params: {
   getDocumentProfile: (document: DocumentRecord) => DocumentIndexProfile | null
 }): WikiGenerationPayloadBundle {
   const missingProfileDocumentIds: string[] = []
+  const generationMode = params.config.wikiGenerationMode ?? 'full'
 
   return {
     themes: params.scope.themeGroups.map((group) => {
       const sourceDocuments = group.sourceDocumentIds.map((documentId) => {
-        const item = buildBundleItem(documentId, params.documentMap, params.getDocumentProfile)
+        const item = buildBundleItem(documentId, params.documentMap, params.getDocumentProfile, generationMode)
         if (!item) {
           throw new Error(`Missing document index profile for wiki source document: ${documentId}`)
         }
@@ -94,7 +96,7 @@ export function buildWikiGenerationPayloads(params: {
       }
     }),
     unclassifiedDocuments: params.scope.unclassifiedDocuments.flatMap((document) => {
-      const item = buildBundleItem(document.id, params.documentMap, params.getDocumentProfile)
+      const item = buildBundleItem(document.id, params.documentMap, params.getDocumentProfile, generationMode)
       if (!item) {
         missingProfileDocumentIds.push(document.id)
         return []
@@ -109,6 +111,7 @@ function buildBundleItem(
   documentId: string,
   documentMap: ReadonlyMap<string, DocumentRecord>,
   getDocumentProfile: (document: DocumentRecord) => DocumentIndexProfile | null,
+  generationMode: 'compressed' | 'full',
 ): WikiBundleDocumentItem | null {
   const document = documentMap.get(documentId)
   if (!document) {
@@ -120,14 +123,25 @@ function buildBundleItem(
     return null
   }
 
+  const primaryBlocks = normalizeSourceBlocks(parseJsonArray<SourceBlockItem>(profile.primarySourceBlocksJson))
+  const secondaryBlocks = normalizeSourceBlocks(parseJsonArray<SourceBlockItem>(profile.secondarySourceBlocksJson))
+
+  const sourceBlockTexts = generationMode === 'full'
+    ? [
+        ...primaryBlocks.map(block => block.text),
+        ...secondaryBlocks.map(block => block.text),
+      ]
+    : []
+
   return {
     documentId,
     title: profile.title || document.title || document.hpath || document.path || document.id,
     positioning: profile.positioning || '',
     propositions: normalizePropositions(parseJsonArray<PropositionItem>(profile.propositionsJson)),
     keywords: parseStringArray(profile.keywordsJson),
-    primarySourceBlocks: normalizeSourceBlocks(parseJsonArray<SourceBlockItem>(profile.primarySourceBlocksJson)),
-    secondarySourceBlocks: normalizeSourceBlocks(parseJsonArray<SourceBlockItem>(profile.secondarySourceBlocksJson)),
+    primarySourceBlocks: primaryBlocks,
+    secondarySourceBlocks: secondaryBlocks,
+    sourceBlockTexts,
     sourceUpdatedAt: profile.sourceUpdatedAt,
     generatedAt: profile.generatedAt,
   }

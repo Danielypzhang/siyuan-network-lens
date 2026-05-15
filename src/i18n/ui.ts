@@ -1625,6 +1625,64 @@ const UI_TEXT = {
       en_US: 'Action text mentions topic doc {name}',
       zh_CN: '动作文案提及主题文档 {name}',
     },
+    wiki: {
+      generationMode: {
+        en_US: 'Wiki generation mode',
+        zh_CN: 'Wiki 生成模式',
+      },
+      generationModeDescription: {
+        en_US: 'Compressed mode uses document indexes only (fast, low cost). Full mode includes document evidence blocks (richer content, higher cost).',
+        zh_CN: '压缩模式仅使用文档索引（快速、低成本）。全文模式包含文档证据块（内容更丰富、成本更高）。',
+      },
+      generationModeCompressed: {
+        en_US: 'Compressed (index only)',
+        zh_CN: '压缩模式（仅索引）',
+      },
+      generationModeFull: {
+        en_US: 'Full (with evidence blocks)',
+        zh_CN: '全文模式（含证据块）',
+      },
+      maintenancePrompt: {
+        en_US: 'Maintenance prompt',
+        zh_CN: '维护提示词',
+      },
+      maintenancePromptDescription: {
+        en_US: 'Custom prompt for Wiki generation. Defines how the AI should analyze and structure wiki content.',
+        zh_CN: '自定义 Wiki 生成提示词，定义 AI 如何分析和组织 Wiki 内容。',
+      },
+      restoreDefaultPrompt: {
+        en_US: 'Restore default',
+        zh_CN: '恢复默认',
+      },
+      hallucinationMarking: {
+        en_US: 'Hallucination risk marking',
+        zh_CN: '幻觉风险标记',
+      },
+      hallucinationMarkingDescription: {
+        en_US: 'Mark each claim with reliability: [✓] source-backed, [~] inferred, [?] unverified, [+] AI suggestion.',
+        zh_CN: '为每个论断标记可靠性：[✓]来源支持、[~]合理推断、[?]待验证、[+] AI建议。',
+      },
+      sourceCitationMode: {
+        en_US: 'Source citation mode',
+        zh_CN: '来源引用模式',
+      },
+      sourceCitationModeDescription: {
+        en_US: 'How source documents are cited in wiki content.',
+        zh_CN: '源文档在 Wiki 内容中的引用方式。',
+      },
+      sourceCitationInline: {
+        en_US: 'Inline (per paragraph)',
+        zh_CN: '行内引用（每段）',
+      },
+      sourceCitationSection: {
+        en_US: 'Section-end (per section)',
+        zh_CN: '章节末尾引用',
+      },
+      sourceCitationBoth: {
+        en_US: 'Both',
+        zh_CN: '两者同时',
+      },
+    },
   },
   analytics: {
     wiki: {

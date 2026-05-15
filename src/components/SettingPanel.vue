@@ -155,6 +155,48 @@
             type="text"
           >
         </label>
+        <div v-if="showWikiSettings" class="setting-field setting-field--full">
+          <span>{{ t('settings.wiki.generationMode') }}</span>
+          <select v-model="config.wikiGenerationMode">
+            <option value="compressed">{{ t('settings.wiki.generationModeCompressed') }}</option>
+            <option value="full">{{ t('settings.wiki.generationModeFull') }}</option>
+          </select>
+          <span class="setting-field__hint">{{ t('settings.wiki.generationModeDescription') }}</span>
+        </div>
+        <label v-if="showWikiSettings" class="setting-item setting-item--full">
+          <span class="setting-item__text">
+            <strong>{{ t('settings.wiki.hallucinationMarking') }}</strong>
+            <span>{{ t('settings.wiki.hallucinationMarkingDescription') }}</span>
+          </span>
+          <input type="checkbox" v-model="config.wikiHallucinationMarkingEnabled" class="b3-switch">
+        </label>
+        <div v-if="showWikiSettings" class="setting-field setting-field--full">
+          <span>{{ t('settings.wiki.sourceCitationMode') }}</span>
+          <select v-model="config.wikiSourceCitationMode">
+            <option value="inline">{{ t('settings.wiki.sourceCitationInline') }}</option>
+            <option value="section">{{ t('settings.wiki.sourceCitationSection') }}</option>
+            <option value="both">{{ t('settings.wiki.sourceCitationBoth') }}</option>
+          </select>
+          <span class="setting-field__hint">{{ t('settings.wiki.sourceCitationModeDescription') }}</span>
+        </div>
+        <div v-if="showWikiSettings" class="setting-field setting-field--full">
+          <span>
+            {{ t('settings.wiki.maintenancePrompt') }}
+            <button
+              class="setting-button setting-button--ghost setting-button--compact"
+              type="button"
+              @click="restoreDefaultWikiPrompt"
+            >
+              {{ t('settings.wiki.restoreDefaultPrompt') }}
+            </button>
+          </span>
+          <textarea
+            v-model="config.wikiMaintenancePrompt"
+            rows="10"
+            class="setting-textarea"
+            :placeholder="t('settings.wiki.maintenancePromptDescription')"
+          />
+        </div>
         <div v-if="showAiServiceSettings" class="setting-field setting-field--full">
           <span>{{ t('settings.ai.provider') }}</span>
           <div class="setting-field__inline">
@@ -424,7 +466,7 @@ import { useSettingPanelAi } from '@/components/use-setting-panel-ai'
 import { t } from '@/i18n/ui'
 import ThemeMultiSelect from '@/components/ThemeMultiSelect.vue'
 import { isAlphaSettingVisible, isAlphaSummaryCardVisible } from '@/plugin/alpha-feature-config'
-import { ensureConfigDefaults, type PluginConfig } from '@/types/config'
+import { ensureConfigDefaults, type PluginConfig, DEFAULT_WIKI_MAINTENANCE_PROMPT, CURRENT_WIKI_PROMPT_VERSION } from '@/types/config'
 
 const props = defineProps<{
   config: PluginConfig
@@ -470,6 +512,11 @@ function toggleSection(sectionKey: SettingSectionKey) {
     ...expandedSections.value,
     [sectionKey]: !expandedSections.value[sectionKey],
   }
+}
+
+function restoreDefaultWikiPrompt() {
+  props.config.wikiMaintenancePrompt = DEFAULT_WIKI_MAINTENANCE_PROMPT
+  props.config.wikiMaintenancePromptVersion = CURRENT_WIKI_PROMPT_VERSION
 }
 
 const {
