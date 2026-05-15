@@ -1,5 +1,6 @@
 import { ref, type ComputedRef } from 'vue'
 
+import { extractKramdownDocumentIds } from '@/analytics/link-associations'
 import { buildSiyuanBlockLinkMarkdown } from '@/analytics/link-sync'
 import { normalizeWikiSourceDocLinkTypes, type WikiSourceDocLinkType } from '@/analytics/wiki-source-docs'
 import { t } from '@/i18n/ui'
@@ -18,16 +19,6 @@ type GetBlockKramdownFn = (id: string) => Promise<{ id: string; kramdown: string
 function pushLinkType(map: Map<string, WikiSourceDocLinkType[]>, documentId: string, type: WikiSourceDocLinkType) {
   const current = map.get(documentId) ?? []
   map.set(documentId, normalizeWikiSourceDocLinkTypes([...current, type]))
-}
-
-function extractRefBlockDocumentIds(kramdown: string): string[] {
-  const ids: string[] = []
-  const regex = /\(\((\d{14,16}-[a-z0-9]{7})\s*["'][^"']*["']\s*\)\)/g
-  let match
-  while ((match = regex.exec(kramdown)) !== null) {
-    ids.push(match[1])
-  }
-  return ids
 }
 
 export function createAppWikiPanelController(params: {

@@ -15,6 +15,20 @@ export interface LinkAssociations {
   childDocuments: LinkAssociationItem[]
 }
 
+const SIYUAN_BLOCK_URL_PATTERN = /siyuan:\/\/blocks\/([^?\s<>"')\]#]+)/gi
+const BLOCK_REFERENCE_PATTERN = /\(\(\s*([^)\s"']+)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)\)/g
+
+export function extractKramdownDocumentIds(kramdown: string): string[] {
+  const ids = new Set<string>()
+  for (const match of kramdown.matchAll(SIYUAN_BLOCK_URL_PATTERN)) {
+    ids.add(match[1])
+  }
+  for (const match of kramdown.matchAll(BLOCK_REFERENCE_PATTERN)) {
+    ids.add(match[1])
+  }
+  return [...ids]
+}
+
 export function buildLinkAssociations(params: {
   documentId: string
   references: ReferenceRecord[]
@@ -22,6 +36,7 @@ export function buildLinkAssociations(params: {
   childDocumentMap?: Map<string, DocumentRecord>
   now: Date
   timeRange: TimeRange
+  kramdown?: string
 }): LinkAssociations {
   const outboundTargets = new Set<string>()
   const inboundSources = new Set<string>()
@@ -43,6 +58,16 @@ export function buildLinkAssociations(params: {
     }
     if (reference.targetDocumentId === params.documentId) {
       inboundSources.add(reference.sourceDocumentId)
+    }
+  }
+
+  if (params.kramdown) {
+    const kramdownIds = extractKramdownDocumentIds(params.kramdown)
+    for (const targetId of kramdownIds) {
+      if (targetId === params.documentId) continue
+      if (params.documentMap.has(targetId)) {
+        outboundTargets.add(targetId)
+      }
     }
   }
 
