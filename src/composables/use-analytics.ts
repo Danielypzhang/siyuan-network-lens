@@ -815,9 +815,11 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
     persistSummaryCardOrder(nextOrder)
   }
 
-  function resolveLinkAssociations(documentId: string) {
-    const cached = linkAssociationsByDocumentId.value.get(documentId)
-    if (cached) return cached
+  function resolveLinkAssociations(documentId: string, kramdown?: string) {
+    if (!kramdown) {
+      const cached = linkAssociationsByDocumentId.value.get(documentId)
+      if (cached) return cached
+    }
 
     if (!snapshot.value) return { outbound: [], inbound: [], childDocuments: [] }
 
@@ -828,6 +830,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
       childDocumentMap: associationDocumentMap.value,
       now: analysisNow.value,
       timeRange: timeRange.value,
+      kramdown,
     })
   }
 

@@ -72,7 +72,7 @@ export function createAppWikiPanelController(params: {
     if (params.getBlockKramdown) {
       try {
         const { kramdown } = await params.getBlockKramdown(documentId)
-        const refBlockIds = extractRefBlockDocumentIds(kramdown)
+        const refBlockIds = extractKramdownDocumentIds(kramdown)
         for (const refId of refBlockIds) {
           if (!sourceDocumentLinkTypes.has(refId)) {
             pushLinkType(sourceDocumentLinkTypes, refId, 'outbound')

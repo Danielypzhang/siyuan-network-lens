@@ -70,7 +70,7 @@
               <button
                 class="ghost-button ghost-button--filled"
               type="button"
-              @click="toggleLinkPanel(item.documentId)"
+              @click="handleToggleLinkPanel(item.documentId)"
             >
                 {{ isLinkPanelExpanded(item.documentId) ? t('rankingPanel.hideRelated') : t('rankingPanel.viewRelated') }}
               </button>
@@ -254,6 +254,7 @@ import type { RankingDetailItem } from '@/analytics/summary-details'
 import type { LinkAssociations } from '@/analytics/link-associations'
 import type { LinkDirection } from '@/analytics/link-sync'
 import type { WikiPreviewState } from '@/composables/use-analytics'
+import { ref } from 'vue'
 import { t } from '@/i18n/ui'
 import DocumentTitle from './DocumentTitle.vue'
 import SuggestionCallout from './SuggestionCallout.vue'
@@ -301,6 +302,7 @@ const props = withDefaults(defineProps<{
   variant?: 'panel' | 'detail'
   collapsedItems?: Record<string, boolean>
   onToggleItemCollapse?: (documentId: string) => void
+  getBlockKramdown?: (id: string) => Promise<{ id: string; kramdown: string }>
 }>(), {
   showWikiPanelActions: true,
   variant: 'panel',
@@ -314,8 +316,26 @@ const emit = defineEmits<{
   (e: 'addTag', documentId: string, tag?: string): void
 }>()
 
+const kramdownMap = ref(new Map<string, string>())
+
+async function handleToggleLinkPanel(documentId: string) {
+  props.toggleLinkPanel(documentId)
+  if (!props.isLinkPanelExpanded(documentId)) {
+    kramdownMap.value.delete(documentId)
+    return
+  }
+  if (!props.getBlockKramdown || kramdownMap.value.has(documentId)) return
+  try {
+    const { kramdown } = await props.getBlockKramdown(documentId)
+    kramdownMap.value.set(documentId, kramdown)
+  } catch {
+    // silently ignore
+  }
+}
+
 function resolveAssociations(documentId: string): LinkAssociations {
-  const associations = props.resolveLinkAssociations(documentId)
+  const kramdown = kramdownMap.value.get(documentId)
+  const associations = props.resolveLinkAssociations(documentId, kramdown)
   return {
     outbound: associations.outbound ?? [],
     inbound: associations.inbound ?? [],

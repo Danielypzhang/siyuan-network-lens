@@ -223,6 +223,7 @@
         :is-link-group-expanded="isLinkGroupExpanded"
         :is-syncing="isSyncing"
         :sync-association="syncAssociation"
+        :get-block-kramdown="getBlockKramdown"
         :format-delta="formatDelta"
         :theme-document-ids="themeDocumentIds"
         :theme-documents="themeDocuments"
