@@ -1,6 +1,7 @@
 import type { DocumentRecord, ReferenceRecord, TimeRange } from './analysis'
 import { filterReferencesByTimeRange } from './analysis'
 import { isChildPath, normalizePath, toChildPathPrefix } from './analysis-context'
+import { sql } from '@/api'
 
 export interface LinkAssociationItem {
   documentId: string
@@ -29,6 +30,18 @@ export function extractKramdownDocumentIds(kramdown: string): string[] {
   return [...ids]
 }
 
+export async function fetchOutboundBlockRefDocumentIds(documentId: string): Promise<string[]> {
+  const escapedId = documentId.replace(/'/g, "''")
+  const rows = await sql(
+    `SELECT DISTINCT r.def_block_root_id AS documentId
+     FROM refs r
+     WHERE r.type = 'ref_id'
+       AND r.root_id = '${escapedId}'
+       AND r.def_block_root_id != '${escapedId}'`
+  ) as Array<{ documentId: string }>
+  return rows.map(row => row.documentId)
+}
+
 export function buildLinkAssociations(params: {
   documentId: string
   references: ReferenceRecord[]
@@ -36,7 +49,7 @@ export function buildLinkAssociations(params: {
   childDocumentMap?: Map<string, DocumentRecord>
   now: Date
   timeRange: TimeRange
-  kramdown?: string
+  extraOutboundDocumentIds?: string[]
 }): LinkAssociations {
   const outboundTargets = new Set<string>()
   const inboundSources = new Set<string>()
@@ -61,9 +74,8 @@ export function buildLinkAssociations(params: {
     }
   }
 
-  if (params.kramdown) {
-    const kramdownIds = extractKramdownDocumentIds(params.kramdown)
-    for (const targetId of kramdownIds) {
+  if (params.extraOutboundDocumentIds) {
+    for (const targetId of params.extraOutboundDocumentIds) {
       if (targetId === params.documentId) continue
       if (params.documentMap.has(targetId)) {
         outboundTargets.add(targetId)

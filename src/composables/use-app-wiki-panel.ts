@@ -1,6 +1,6 @@
 import { ref, type ComputedRef } from 'vue'
 
-import { extractKramdownDocumentIds } from '@/analytics/link-associations'
+import { fetchOutboundBlockRefDocumentIds } from '@/analytics/link-associations'
 import { buildSiyuanBlockLinkMarkdown } from '@/analytics/link-sync'
 import { normalizeWikiSourceDocLinkTypes, type WikiSourceDocLinkType } from '@/analytics/wiki-source-docs'
 import { t } from '@/i18n/ui'
@@ -14,8 +14,6 @@ type LinkAssociations = {
   childDocuments: DocumentIdItem[]
 }
 
-type GetBlockKramdownFn = (id: string) => Promise<{ id: string; kramdown: string }>
-
 function pushLinkType(map: Map<string, WikiSourceDocLinkType[]>, documentId: string, type: WikiSourceDocLinkType) {
   const current = map.get(documentId) ?? []
   map.set(documentId, normalizeWikiSourceDocLinkTypes([...current, type]))
@@ -27,7 +25,6 @@ export function createAppWikiPanelController(params: {
   resolveTitle: (documentId: string) => string
   prepareWikiPreview: (request?: WikiPreviewRequest) => Promise<void>
   onSwitchDocument: (themeDocumentId: string) => void | Promise<void>
-  getBlockKramdown?: GetBlockKramdownFn
 }) {
   const wikiPanelPlacement = ref<'ranking' | ''>('')
   const wikiPanelCoreDocumentId = ref('')
@@ -69,20 +66,17 @@ export function createAppWikiPanelController(params: {
       pushLinkType(sourceDocumentLinkTypes, item.documentId, 'child')
     }
 
-    if (params.getBlockKramdown) {
-      try {
-        const { kramdown } = await params.getBlockKramdown(documentId)
-        const refBlockIds = extractKramdownDocumentIds(kramdown)
-        for (const refId of refBlockIds) {
+    try {
+        const blockRefDocIds = await fetchOutboundBlockRefDocumentIds(documentId)
+        for (const refId of blockRefDocIds) {
           if (!sourceDocumentLinkTypes.has(refId)) {
             pushLinkType(sourceDocumentLinkTypes, refId, 'outbound')
             sourceDocumentIds.push(refId)
           }
         }
       } catch {
-        // silently ignore kramdown read errors
+        // silently ignore
       }
-    }
 
     activeWikiPreviewRequest.value = {
       sourceDocumentIds: [...new Set(sourceDocumentIds)],

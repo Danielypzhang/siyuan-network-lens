@@ -252,6 +252,7 @@
 <script setup lang="ts">
 import type { RankingDetailItem } from '@/analytics/summary-details'
 import type { LinkAssociations } from '@/analytics/link-associations'
+import { fetchOutboundBlockRefDocumentIds } from '@/analytics/link-associations'
 import type { LinkDirection } from '@/analytics/link-sync'
 import type { WikiPreviewState } from '@/composables/use-analytics'
 import { ref } from 'vue'
@@ -302,7 +303,6 @@ const props = withDefaults(defineProps<{
   variant?: 'panel' | 'detail'
   collapsedItems?: Record<string, boolean>
   onToggleItemCollapse?: (documentId: string) => void
-  getBlockKramdown?: (id: string) => Promise<{ id: string; kramdown: string }>
 }>(), {
   showWikiPanelActions: true,
   variant: 'panel',
@@ -316,26 +316,26 @@ const emit = defineEmits<{
   (e: 'addTag', documentId: string, tag?: string): void
 }>()
 
-const kramdownMap = ref(new Map<string, string>())
+const extraOutboundDocIdsMap = ref(new Map<string, string[]>())
 
 async function handleToggleLinkPanel(documentId: string) {
   props.toggleLinkPanel(documentId)
   if (!props.isLinkPanelExpanded(documentId)) {
-    kramdownMap.value.delete(documentId)
+    extraOutboundDocIdsMap.value.delete(documentId)
     return
   }
-  if (!props.getBlockKramdown || kramdownMap.value.has(documentId)) return
+  if (extraOutboundDocIdsMap.value.has(documentId)) return
   try {
-    const { kramdown } = await props.getBlockKramdown(documentId)
-    kramdownMap.value.set(documentId, kramdown)
+    const docIds = await fetchOutboundBlockRefDocumentIds(documentId)
+    extraOutboundDocIdsMap.value.set(documentId, docIds)
   } catch {
-    // silently ignore
+    extraOutboundDocIdsMap.value.set(documentId, [])
   }
 }
 
 function resolveAssociations(documentId: string): LinkAssociations {
-  const kramdown = kramdownMap.value.get(documentId)
-  const associations = props.resolveLinkAssociations(documentId, kramdown)
+  const extraOutboundDocumentIds = extraOutboundDocIdsMap.value.get(documentId)
+  const associations = props.resolveLinkAssociations(documentId, extraOutboundDocumentIds)
   return {
     outbound: associations.outbound ?? [],
     inbound: associations.inbound ?? [],
