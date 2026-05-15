@@ -40,6 +40,7 @@ import {
   countSelectedSummaryItems,
   type PathScope,
 } from './use-analytics-derived'
+import { buildLinkAssociations } from '@/analytics/link-associations'
 import {
   createAiSuggestionActions,
   createLinkAssociationInteractions,
@@ -815,7 +816,19 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
   }
 
   function resolveLinkAssociations(documentId: string) {
-    return linkAssociationsByDocumentId.value.get(documentId) ?? { outbound: [], inbound: [], childDocuments: [] }
+    const cached = linkAssociationsByDocumentId.value.get(documentId)
+    if (cached) return cached
+
+    if (!snapshot.value) return { outbound: [], inbound: [], childDocuments: [] }
+
+    return buildLinkAssociations({
+      documentId,
+      references: snapshot.value.references,
+      documentMap: sampleDocumentMap.value,
+      childDocumentMap: associationDocumentMap.value,
+      now: analysisNow.value,
+      timeRange: timeRange.value,
+    })
   }
 
   function togglePanel(key: PanelKey) {

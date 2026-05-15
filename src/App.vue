@@ -448,6 +448,7 @@ const {
   resolveTitle,
   prepareWikiPreview,
   onSwitchDocument: restoreCachedWikiPreview,
+  getBlockKramdown,
 })
 
 const wikiPanelProps = computed(() => ({

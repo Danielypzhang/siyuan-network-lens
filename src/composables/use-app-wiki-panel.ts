@@ -13,9 +13,21 @@ type LinkAssociations = {
   childDocuments: DocumentIdItem[]
 }
 
+type GetBlockKramdownFn = (id: string) => Promise<{ id: string; kramdown: string }>
+
 function pushLinkType(map: Map<string, WikiSourceDocLinkType[]>, documentId: string, type: WikiSourceDocLinkType) {
   const current = map.get(documentId) ?? []
   map.set(documentId, normalizeWikiSourceDocLinkTypes([...current, type]))
+}
+
+function extractRefBlockDocumentIds(kramdown: string): string[] {
+  const ids: string[] = []
+  const regex = /\(\((\d{14,16}-[a-z0-9]{7})\s*["'][^"']*["']\s*\)\)/g
+  let match
+  while ((match = regex.exec(kramdown)) !== null) {
+    ids.push(match[1])
+  }
+  return ids
 }
 
 export function createAppWikiPanelController(params: {
@@ -24,6 +36,7 @@ export function createAppWikiPanelController(params: {
   resolveTitle: (documentId: string) => string
   prepareWikiPreview: (request?: WikiPreviewRequest) => Promise<void>
   onSwitchDocument: (themeDocumentId: string) => void | Promise<void>
+  getBlockKramdown?: GetBlockKramdownFn
 }) {
   const wikiPanelPlacement = ref<'ranking' | ''>('')
   const wikiPanelCoreDocumentId = ref('')
@@ -63,6 +76,21 @@ export function createAppWikiPanelController(params: {
     }
     for (const item of associations.childDocuments) {
       pushLinkType(sourceDocumentLinkTypes, item.documentId, 'child')
+    }
+
+    if (params.getBlockKramdown) {
+      try {
+        const { kramdown } = await params.getBlockKramdown(documentId)
+        const refBlockIds = extractRefBlockDocumentIds(kramdown)
+        for (const refId of refBlockIds) {
+          if (!sourceDocumentLinkTypes.has(refId)) {
+            pushLinkType(sourceDocumentLinkTypes, refId, 'outbound')
+            sourceDocumentIds.push(refId)
+          }
+        }
+      } catch {
+        // silently ignore kramdown read errors
+      }
     }
 
     activeWikiPreviewRequest.value = {
