@@ -220,7 +220,19 @@ export function createAnalyticsWikiActionsController(params: {
         : new Map(effectiveSourceDocuments.map(d => [d.id, 'new' as const]))
 
       const hasChanges = [...deltaMap.values()].some(s => s !== 'unchanged')
-      if (!hasChanges) {
+      console.info('[NetworkLens][Wiki] Incremental check:', {
+        isIncremental,
+        hasStoredTimestamps: Boolean(storedRecord?.sourceDocumentTimestamps),
+        hasChanges,
+        deltaSummary: {
+          new: [...deltaMap.values()].filter(s => s === 'new').length,
+          changed: [...deltaMap.values()].filter(s => s === 'changed').length,
+          unchanged: [...deltaMap.values()].filter(s => s === 'unchanged').length,
+          deleted: [...deltaMap.values()].filter(s => s === 'deleted').length,
+        },
+        sourceDocumentCount: effectiveSourceDocuments.length,
+      })
+      if (isIncremental && storedRecord?.sourceDocumentTimestamps && !hasChanges) {
         const cached = params.wikiPreviewCache.value.get(request.themeDocumentId)
         if (cached) {
           params.wikiPreview.value = cached
@@ -274,8 +286,7 @@ export function createAnalyticsWikiActionsController(params: {
           return
         }
 
-        params.notify(t('analytics.wiki.noSourceChangesUseCache'), 3000, 'info')
-        return
+        console.info('[NetworkLens][Wiki] All unchanged but no existing page found, proceeding with AI generation')
       }
 
       const sourceDocumentTimestamps: Record<string, string> = {}
@@ -294,6 +305,10 @@ export function createAnalyticsWikiActionsController(params: {
           getBlockKramdown: params.getBlockKramdown,
         })
         existingWikiContent = existingPage?.managedMarkdown
+        console.info('[NetworkLens][Wiki] Existing wiki page resolved:', {
+          hasExistingWikiContent: Boolean(existingWikiContent),
+          existingContentLength: existingWikiContent?.length ?? 0,
+        })
       }
       // --- End incremental diff logic ---
 
