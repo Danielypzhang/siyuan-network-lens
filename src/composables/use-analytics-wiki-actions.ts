@@ -177,10 +177,8 @@ export function createAnalyticsWikiActionsController(params: {
         config: params.appliedConfig.value,
         aiIndexStore: params.aiIndexStore,
         forwardProxy: params.forwardProxy,
-        getChildBlocks: params.getChildBlocks,
         getBlockKramdown: params.getBlockKramdown,
         generatedAt,
-        blockRefIds,
       })
       const sourceProfileMap = sourceProfileResult.profileMap
       const effectiveSourceDocuments = sourceProfileResult.effectiveDocuments

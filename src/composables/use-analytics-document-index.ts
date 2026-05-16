@@ -52,7 +52,6 @@ export function createAnalyticsDocumentIndexController(params: {
         sourceDocument: document,
         indexStore: params.aiIndexStore,
         forwardProxy: params.forwardProxy,
-        getChildBlocks: params.getChildBlocks,
         getBlockKramdown: params.getBlockKramdown,
         force: true,
       })

@@ -7,7 +7,7 @@ export interface ClassifiedSourceBlocks {
 
 const PRIMARY_CHAR_THRESHOLD = 80
 const SECONDARY_CHAR_THRESHOLD = 30
-const MAX_SOURCE_TEXT_LENGTH = 8000
+const MAX_SOURCE_BLOCK_CHARS = 12000
 
 const BLOCK_REF_PATTERN = /\(\([0-9a-f]{22}\s+"[^"]*"\)\)/g
 const INLINE_MATH_PATTERN = /\$[^$]+\$/g
@@ -22,10 +22,13 @@ export async function collectDocumentSourceBlocks(params: {
     const { kramdown } = await params.getBlockKramdown(params.documentId)
     const plainText = stripKramdownMarkers(kramdown)
     if (plainText && plainText.length >= SECONDARY_CHAR_THRESHOLD) {
-      const isPrimary = plainText.length >= PRIMARY_CHAR_THRESHOLD
+      const truncated = plainText.length > MAX_SOURCE_BLOCK_CHARS
+        ? plainText.slice(0, MAX_SOURCE_BLOCK_CHARS)
+        : plainText
+      const isPrimary = truncated.length >= PRIMARY_CHAR_THRESHOLD
       return {
-        primary: isPrimary ? [{ blockId: params.documentId, text: plainText }] : [],
-        secondary: isPrimary ? [] : [{ blockId: params.documentId, text: plainText }],
+        primary: isPrimary ? [{ blockId: params.documentId, text: truncated }] : [],
+        secondary: isPrimary ? [] : [{ blockId: params.documentId, text: truncated }],
       }
     }
   } catch {
