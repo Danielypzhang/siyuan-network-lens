@@ -35,7 +35,7 @@ describe('buildLinkAssociations', () => {
     ])
   })
 
-  it('lists child documents with overlap markers for those also in inbound or outbound groups', () => {
+  it('lists child documents that are not already included in inbound or outbound groups', () => {
     const documents = new Map([
       ['doc-core', { id: 'doc-core', box: 'box-1', path: '/core.sy', hpath: '/Core', title: 'Core' }],
       ['doc-child-outbound', { id: 'doc-child-outbound', box: 'box-1', path: '/core/child-outbound.sy', hpath: '/Core/Child Outbound', title: 'Child Outbound' }],
@@ -55,10 +55,6 @@ describe('buildLinkAssociations', () => {
       timeRange: '7d',
     })
 
-    expect(associations.childDocuments.map(item => ({ id: item.documentId, overlap: item.isOverlap }))).toEqual([
-      { id: 'doc-child-inbound', overlap: true },
-      { id: 'doc-child-only', overlap: false },
-      { id: 'doc-child-outbound', overlap: true },
-    ])
+    expect(associations.childDocuments.map(item => item.documentId)).toEqual(['doc-child-only'])
   })
 })

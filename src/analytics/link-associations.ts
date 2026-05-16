@@ -176,7 +176,7 @@ export function buildLinkAssociations(params: {
   const childDocuments = buildChildAssociationList({
     coreDocumentId: params.documentId,
     documentMap: params.childDocumentMap ?? params.documentMap,
-    overlap: overlap,
+    excluded: new Set([...outboundTargets, ...inboundSources]),
   })
 
   return { outbound, inbound, childDocuments }
@@ -223,7 +223,7 @@ function resolveTitle(document: DocumentRecord): string {
 function buildChildAssociationList(params: {
   coreDocumentId: string
   documentMap: Map<string, DocumentRecord>
-  overlap: Set<string>
+  excluded: Set<string>
 }): LinkAssociationItem[] {
   const coreDocument = params.documentMap.get(params.coreDocumentId)
   if (!coreDocument) {
@@ -235,13 +235,16 @@ function buildChildAssociationList(params: {
       if (candidate.id === params.coreDocumentId) {
         return false
       }
+      if (params.excluded.has(candidate.id)) {
+        return false
+      }
       return isChildDocument(coreDocument, candidate)
     })
     .map(candidate => ({
       documentId: candidate.id,
       title: resolveTitle(candidate),
       direction: 'child' as const,
-      isOverlap: params.overlap.has(candidate.id),
+      isOverlap: false,
     }))
     .sort((left, right) => left.title.localeCompare(right.title, 'zh-CN'))
 }
