@@ -67,38 +67,33 @@ export function createAiWikiStore(storage: PluginStorageLike): AiWikiStore {
       return record
     },
     async savePageRecord(record) {
-      console.info('[NetworkLens][WikiStore] savePageRecord called:', {
-        pageType: record.pageType,
-        pageTitle: record.pageTitle,
-        themeDocumentId: record.themeDocumentId,
-        hasTimestamps: Boolean(record.sourceDocumentTimestamps),
-        timestampKeys: record.sourceDocumentTimestamps ? Object.keys(record.sourceDocumentTimestamps) : [],
-        sourceDocumentIdsCount: record.sourceDocumentIds?.length ?? 0,
-        sourceDocumentIds: record.sourceDocumentIds,
-      })
-
       const snapshot = await loadSnapshot(storage)
       const pageKey = buildWikiPageStorageKey({
         pageType: record.pageType,
         pageTitle: record.pageTitle,
         themeDocumentId: record.themeDocumentId,
       })
+
+      const existingRecord = snapshot.pages[pageKey]
+      const mergedRecord = { ...record }
+      if (!mergedRecord.sourceDocumentTimestamps || Object.keys(mergedRecord.sourceDocumentTimestamps).length === 0) {
+        if (existingRecord?.sourceDocumentTimestamps && Object.keys(existingRecord.sourceDocumentTimestamps).length > 0) {
+          mergedRecord.sourceDocumentTimestamps = existingRecord.sourceDocumentTimestamps
+        }
+      }
+
       console.info('[NetworkLens][WikiStore] savePageRecord:', {
         pageKey,
-        existingKeys: Object.keys(snapshot.pages),
-        snapshotSchemaVersion: snapshot.schemaVersion,
-      })
-      snapshot.pages[pageKey] = normalizePageRecord(record)
-
-      const normalizedRecord = snapshot.pages[pageKey]
-      console.info('[NetworkLens][WikiStore] savePageRecord after normalize:', {
-        pageKey,
-        normalizedHasTimestamps: Boolean(normalizedRecord.sourceDocumentTimestamps),
-        normalizedTimestampKeys: normalizedRecord.sourceDocumentTimestamps ? Object.keys(normalizedRecord.sourceDocumentTimestamps) : [],
+        incomingHasTimestamps: Boolean(record.sourceDocumentTimestamps),
+        incomingTimestampKeys: record.sourceDocumentTimestamps ? Object.keys(record.sourceDocumentTimestamps) : [],
+        existingHasTimestamps: Boolean(existingRecord?.sourceDocumentTimestamps),
+        existingTimestampKeys: existingRecord?.sourceDocumentTimestamps ? Object.keys(existingRecord.sourceDocumentTimestamps) : [],
+        mergedHasTimestamps: Boolean(mergedRecord.sourceDocumentTimestamps),
+        mergedTimestampKeys: mergedRecord.sourceDocumentTimestamps ? Object.keys(mergedRecord.sourceDocumentTimestamps) : [],
       })
 
+      snapshot.pages[pageKey] = normalizePageRecord(mergedRecord)
       await saveSnapshot(storage, snapshot)
-      console.info('[NetworkLens][WikiStore] savePageRecord completed:', { pageKey })
     },
 
     async deletePageRecord(pageKey) {
