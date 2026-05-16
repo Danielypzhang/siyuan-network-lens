@@ -95,9 +95,9 @@ export async function fetchBlockDocumentRecords(blockIds: string[]): Promise<Map
   if (blockIds.length === 0) return new Map()
   const ids = blockIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',')
   const rows = await sql(
-    `SELECT id, box, path, hpath, content, root_id AS rootId
+    `SELECT id, box, path, hpath, content, created, updated, root_id AS rootId
      FROM blocks WHERE id IN (${ids})`
-  ) as Array<{ id: string; box: string; path: string; hpath: string; content: string | null; rootId: string }>
+  ) as Array<{ id: string; box: string; path: string; hpath: string; content: string | null; created: string; updated: string; rootId: string }>
   const map = new Map<string, DocumentRecord>()
   for (const row of rows) {
     map.set(row.id, {
@@ -107,8 +107,8 @@ export async function fetchBlockDocumentRecords(blockIds: string[]): Promise<Map
       hpath: row.hpath,
       title: row.content || row.id,
       content: row.content || '',
-      created: '',
-      updated: '',
+      created: row.created || '',
+      updated: row.updated || '',
     })
   }
   return map
