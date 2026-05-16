@@ -510,8 +510,13 @@ export function createAnalyticsWikiActionsController(params: {
 
       const sourceDocumentTimestamps: Record<string, string> = {}
       const previousTimestamps = storedRecord?.sourceDocumentTimestamps
+      if (previousTimestamps) {
+        for (const [id, ts] of Object.entries(previousTimestamps)) {
+          sourceDocumentTimestamps[id] = ts
+        }
+      }
       for (const doc of effectiveSourceDocuments) {
-        if (processedDocIds.has(doc.id) || (previousTimestamps && previousTimestamps[doc.id])) {
+        if (processedDocIds.has(doc.id)) {
           sourceDocumentTimestamps[doc.id] = doc.updated
         }
       }
