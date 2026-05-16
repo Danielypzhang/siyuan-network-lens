@@ -304,18 +304,23 @@ export function createAnalyticsWikiActionsController(params: {
         documentMap: scopedDocumentMap,
         getDocumentProfile: document => sourceProfileMap.get(document.id) ?? null,
         deltaMap,
+        isIncremental: isIncremental && Boolean(storedRecord?.sourceDocumentTimestamps),
       })
+
+      const isIncrementalUpdate = isIncremental && Boolean(storedRecord?.sourceDocumentTimestamps)
 
       const diagnosis = await params.aiWikiService.diagnoseThemeTemplate({
         config: params.appliedConfig.value,
         payload,
         existingWikiContent,
+        isIncremental: isIncrementalUpdate,
       })
       const pagePlan = await params.aiWikiService.planThemePage({
         config: params.appliedConfig.value,
         payload,
         diagnosis,
         existingWikiContent,
+        isIncremental: isIncrementalUpdate,
       })
       const sections = await Promise.all(pagePlan.sectionOrder.map(sectionType => params.aiWikiService!.generateThemeSection({
         config: params.appliedConfig.value,
@@ -324,6 +329,7 @@ export function createAnalyticsWikiActionsController(params: {
         pagePlan,
         sectionType,
         existingWikiContent,
+        isIncremental: isIncrementalUpdate,
       })))
       const sourceDocumentTitleMap = Object.fromEntries(payload.sourceDocuments.map(doc => [doc.documentId, doc.title]))
       const draft = renderThemeWikiDraft({
@@ -590,8 +596,10 @@ function buildSingleThemeWikiPayload(params: {
   documentMap: ReadonlyMap<string, DocumentRecord>
   getDocumentProfile: (document: DocumentRecord) => DocumentIndexProfile | null
   deltaMap?: Map<string, 'new' | 'changed' | 'unchanged' | 'deleted'>
+  isIncremental?: boolean
 }): WikiThemeBundle {
   const generationMode = params.config.wikiGenerationMode ?? 'full'
+  const isIncremental = params.isIncremental ?? false
 
   const bundleDocuments = params.sourceDocuments.map((document) => {
     const profile = params.getDocumentProfile(document)
@@ -609,7 +617,10 @@ function buildSingleThemeWikiPayload(params: {
       .map(item => ({ blockId: item.blockId.trim(), text: item.text.trim() }))
       .filter(item => item.blockId.length > 0 && item.text.length > 0)
 
-    const sourceBlockTexts = generationMode === 'full'
+    const deltaStatus = params.deltaMap?.get(document.id) ?? 'new'
+    const isUnchanged = isIncremental && deltaStatus === 'unchanged'
+
+    const sourceBlockTexts = (generationMode === 'full' && !isUnchanged)
       ? [...primaryBlocks.map(block => block.text), ...secondaryBlocks.map(block => block.text)]
       : []
 

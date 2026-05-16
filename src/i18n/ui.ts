@@ -1963,8 +1963,8 @@ const UI_TEXT = {
         zh_CN: '当 sectionType 为 "conflict" 时：识别真正的矛盾——同一主题下不同源文档中的对立结论、互斥主张或直接冲突的建议。不要将互补视角、不同角度或递进阐述误判为冲突。每个冲突条目必须引用至少一个 sourceRef。同一冲突的对立双方必须引用不同的源文档。使用现有 sourceRefs 机制进行引用（documentId + 序号）。如果源文档间不存在真正的冲突，返回空的 blocks 数组。',
       },
       incrementalModePrompt: {
-        en_US: 'You are in incremental update mode. The existing wiki page content is provided as context. Preserve parts unaffected by changed documents. Update or supplement parts affected by new/changed documents. Remove references to deleted documents. Output complete updated sections (not fragments).',
-        zh_CN: '你正处于增量更新模式。现有 wiki 页面内容作为上下文提供。保留未受变化文档影响的部分。更新或补充受新增/变化文档影响的部分。移除已删除文档相关的引用和内容。输出完整的更新后章节（非片段）。',
+        en_US: 'You are in incremental update mode. The existing wiki page content is provided as context — it already contains information from unchanged source documents. Source documents marked deltaStatus="unchanged" only provide metadata (id, title, positioning, keywords) without full content — their details are already reflected in the existing wiki. Source documents marked deltaStatus="new" or deltaStatus="changed" include full content (sourceBlockTexts). Source documents marked deltaStatus="deleted" should have their references removed. Preserve parts unaffected by changed documents. Update or supplement parts affected by new/changed documents. Remove references to deleted documents. Output complete updated sections (not fragments).',
+        zh_CN: '你正处于增量更新模式。现有 wiki 页面内容作为上下文提供——其中已包含未变更源文档的信息。标记为 deltaStatus="unchanged" 的源文档仅提供元数据（ID、标题、定位、关键词），不含完整内容——其详情已体现在现有 wiki 中。标记为 deltaStatus="new" 或 deltaStatus="changed" 的源文档包含完整内容（sourceBlockTexts）。标记为 deltaStatus="deleted" 的源文档应移除其相关引用。保留未受变化文档影响的部分。更新或补充受新增/变化文档影响的部分。移除已删除文档相关的引用和内容。输出完整的更新后章节（非片段）。',
       },
       noSourceChangesUseCache: {
         en_US: 'No new or changed source documents found. Showing the previous preview.',

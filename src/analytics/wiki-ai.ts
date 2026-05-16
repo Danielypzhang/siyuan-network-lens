@@ -50,12 +50,14 @@ export interface AiWikiService {
     config: AiConfig
     payload: WikiThemeBundle
     existingWikiContent?: string
+    isIncremental?: boolean
   }) => Promise<WikiTemplateDiagnosis>
   planThemePage: (params: {
     config: AiConfig
     payload: WikiThemeBundle
     diagnosis: WikiTemplateDiagnosis
     existingWikiContent?: string
+    isIncremental?: boolean
   }) => Promise<WikiPagePlan>
   generateThemeSection: (params: {
     config: AiConfig
@@ -64,6 +66,7 @@ export interface AiWikiService {
     pagePlan: WikiPagePlan
     sectionType: WikiSectionType
     existingWikiContent?: string
+    isIncremental?: boolean
   }) => Promise<WikiSectionDraft>
 }
 
@@ -129,8 +132,9 @@ function buildWikiUserPayload(params: {
   existingWikiContent?: string
   maxInputTokens?: number
   systemPromptChars?: number
+  isIncremental?: boolean
 }): string {
-  const { payload, diagnosis, pagePlan, sectionType, existingWikiContent, maxInputTokens, systemPromptChars } = params
+  const { payload, diagnosis, pagePlan, sectionType, existingWikiContent, maxInputTokens, systemPromptChars, isIncremental } = params
 
   const CHARS_PER_TOKEN = 2.5
   const systemPromptTokens = (systemPromptChars ?? 0) / CHARS_PER_TOKEN
@@ -145,14 +149,39 @@ function buildWikiUserPayload(params: {
     : Infinity
   const availableChars = availableTokens * CHARS_PER_TOKEN
 
+  const hasExistingWiki = Boolean(existingWikiContent)
+
   let sourceDocChars = 0
   const sourceDocuments = payload.sourceDocuments.map(doc => {
+    const deltaStatus = (doc as any).deltaStatus as string | undefined
+    const isUnchanged = isIncremental && hasExistingWiki && deltaStatus === 'unchanged'
+    const isDeleted = deltaStatus === 'deleted'
+
+    if (isDeleted) {
+      return {
+        documentId: doc.documentId,
+        title: doc.title,
+        deltaStatus: 'deleted',
+      }
+    }
+
+    if (isUnchanged) {
+      return {
+        documentId: doc.documentId,
+        title: doc.title,
+        positioning: doc.positioning,
+        keywords: doc.keywords,
+        deltaStatus: 'unchanged',
+      }
+    }
+
     const base: any = {
       documentId: doc.documentId,
       title: doc.title,
       positioning: doc.positioning,
       propositions: doc.propositions,
       keywords: doc.keywords,
+      deltaStatus: deltaStatus || 'new',
     }
     if (doc.sourceBlockTexts && doc.sourceBlockTexts.length > 0) {
       const totalTextLen = doc.sourceBlockTexts.reduce((sum, t) => sum + t.length, 0)
@@ -250,6 +279,7 @@ export function createAiWikiService(deps: {
                 existingWikiContent: params.existingWikiContent,
                 maxInputTokens: requestOptions.maxTokens,
                 systemPromptChars: systemPrompt.length,
+                isIncremental: params.isIncremental,
               }),
             ].join('\n'),
           },
@@ -290,6 +320,7 @@ export function createAiWikiService(deps: {
                 existingWikiContent: params.existingWikiContent,
                 maxInputTokens: requestOptions.maxTokens,
                 systemPromptChars: systemPrompt.length,
+                isIncremental: params.isIncremental,
               }),
             ].join('\n'),
           },
@@ -342,6 +373,7 @@ export function createAiWikiService(deps: {
                 existingWikiContent: params.existingWikiContent,
                 maxInputTokens: requestOptions.maxTokens,
                 systemPromptChars: systemPrompt.length,
+                isIncremental: params.isIncremental,
               }),
             ].join('\n'),
           },
