@@ -223,17 +223,20 @@ export function createAiWikiService(deps: {
     async diagnoseThemeTemplate(params) {
       assertAiReady(params.config)
 
+      const requestOptions = resolveAiRequestOptions(params.config)
+      const systemPrompt = [
+        buildWikiSystemPrompt(params.config),
+        'Diagnose the best wiki template for the current theme.',
+        'The JSON must include templateType, confidence, reason, enabledModules, suppressedModules, and evidenceSummary.',
+      ].join(' ')
+
       const response = await requestChatCompletion({
         config: params.config,
         forwardProxy: deps.forwardProxy,
         messages: [
           {
             role: 'system',
-            content: [
-              buildWikiSystemPrompt(params.config),
-              'Diagnose the best wiki template for the current theme.',
-              'The JSON must include templateType, confidence, reason, enabledModules, suppressedModules, and evidenceSummary.',
-            ].join(' '),
+            content: systemPrompt,
           },
           {
             role: 'user',
@@ -242,7 +245,12 @@ export function createAiWikiService(deps: {
               t('analytics.wiki.diagnoseThemeTemplateSchemaPrompt'),
               t('analytics.wiki.conservativeFallbackPrompt'),
               '',
-              buildWikiUserPayload({ payload: params.payload, existingWikiContent: params.existingWikiContent }),
+              buildWikiUserPayload({
+                payload: params.payload,
+                existingWikiContent: params.existingWikiContent,
+                maxInputTokens: requestOptions.maxTokens,
+                systemPromptChars: systemPrompt.length,
+              }),
             ].join('\n'),
           },
         ],
@@ -254,17 +262,20 @@ export function createAiWikiService(deps: {
     async planThemePage(params) {
       assertAiReady(params.config)
 
+      const requestOptions = resolveAiRequestOptions(params.config)
+      const systemPrompt = [
+        buildWikiSystemPrompt(params.config),
+        'Generate a wiki page plan for the diagnosed theme template.',
+        'The JSON must include templateType, confidence, coreSections, optionalSections, sectionOrder, sectionGoals, and sectionFormats.',
+      ].join(' ')
+
       const response = await requestChatCompletion({
         config: params.config,
         forwardProxy: deps.forwardProxy,
         messages: [
           {
             role: 'system',
-            content: [
-              buildWikiSystemPrompt(params.config),
-              'Generate a wiki page plan for the diagnosed theme template.',
-              'The JSON must include templateType, confidence, coreSections, optionalSections, sectionOrder, sectionGoals, and sectionFormats.',
-            ].join(' '),
+            content: systemPrompt,
           },
           {
             role: 'user',
@@ -273,7 +284,13 @@ export function createAiWikiService(deps: {
               t('analytics.wiki.planThemePageSchemaPrompt'),
               t('analytics.wiki.conservativeFallbackPrompt'),
               '',
-              buildWikiUserPayload({ payload: params.payload, diagnosis: params.diagnosis, existingWikiContent: params.existingWikiContent }),
+              buildWikiUserPayload({
+                payload: params.payload,
+                diagnosis: params.diagnosis,
+                existingWikiContent: params.existingWikiContent,
+                maxInputTokens: requestOptions.maxTokens,
+                systemPromptChars: systemPrompt.length,
+              }),
             ].join('\n'),
           },
         ],
@@ -285,27 +302,30 @@ export function createAiWikiService(deps: {
     async generateThemeSection(params) {
       assertAiReady(params.config)
 
+      const requestOptions = resolveAiRequestOptions(params.config)
+      const systemPrompt = (() => {
+        const parts = [
+          buildWikiSystemPrompt(params.config),
+          'Generate exactly one wiki section draft.',
+          'The JSON must include sectionType, title, format, blocks, and sourceRefs.',
+          'Each block must include text and sourceRefs.',
+          'For every block, populate sourceRefs with the documentId values from the provided source documents that best support that block content. Use documentId, never blockId.',
+          'For the sources (catalog) section, each block sourceRefs must include all relevant source documentIds so the renderer can produce explicit reference entries.',
+          'For the intro (overview) section, each block text must be a concise self-contained summary sentence. Do not include block IDs, document IDs, or technical identifiers in the visible text.',
+        ]
+        if (params.sectionType === 'conflict') {
+          parts.push(t('analytics.wiki.conflictSectionPrompt'))
+        }
+        return parts.join(' ')
+      })()
+
       const response = await requestChatCompletion({
         config: params.config,
         forwardProxy: deps.forwardProxy,
         messages: [
           {
             role: 'system',
-            content: (() => {
-              const parts = [
-                buildWikiSystemPrompt(params.config),
-                'Generate exactly one wiki section draft.',
-                'The JSON must include sectionType, title, format, blocks, and sourceRefs.',
-                'Each block must include text and sourceRefs.',
-                'For every block, populate sourceRefs with the documentId values from the provided source documents that best support that block content. Use documentId, never blockId.',
-                'For the sources (catalog) section, each block sourceRefs must include all relevant source documentIds so the renderer can produce explicit reference entries.',
-                'For the intro (overview) section, each block text must be a concise self-contained summary sentence. Do not include block IDs, document IDs, or technical identifiers in the visible text.',
-              ]
-              if (params.sectionType === 'conflict') {
-                parts.push(t('analytics.wiki.conflictSectionPrompt'))
-              }
-              return parts.join(' ')
-            })(),
+            content: systemPrompt,
           },
           {
             role: 'user',
@@ -320,6 +340,8 @@ export function createAiWikiService(deps: {
                 pagePlan: params.pagePlan,
                 sectionType: params.sectionType,
                 existingWikiContent: params.existingWikiContent,
+                maxInputTokens: requestOptions.maxTokens,
+                systemPromptChars: systemPrompt.length,
               }),
             ].join('\n'),
           },
