@@ -17,29 +17,49 @@ export interface LinkAssociations {
 }
 
 const SIYUAN_BLOCK_URL_PATTERN = /siyuan:\/\/blocks\/([^?\s<>"')\]#]+)/gi
-const BLOCK_REFERENCE_PATTERN = /\(\(\s*([^)\s"']+)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)\)/g
+const BLOCK_REFERENCE_PATTERN = /\(\(\s*([^)\s"']+)(?:\s+"([^"]*)")?\s*\)\)/g
 
-export function extractKramdownDocumentIds(kramdown: string): string[] {
-  const ids = new Set<string>()
-  for (const match of kramdown.matchAll(SIYUAN_BLOCK_URL_PATTERN)) {
-    ids.add(match[1])
-  }
-  for (const match of kramdown.matchAll(BLOCK_REFERENCE_PATTERN)) {
-    ids.add(match[1])
-  }
-  return [...ids]
+export interface ExtractedDocRef {
+  documentId: string
+  anchorText?: string
 }
 
-export async function fetchOutboundBlockRefDocumentIds(documentId: string): Promise<string[]> {
+export function extractKramdownDocumentIds(kramdown: string): ExtractedDocRef[] {
+  const map = new Map<string, ExtractedDocRef>()
+  for (const match of kramdown.matchAll(SIYUAN_BLOCK_URL_PATTERN)) {
+    const id = match[1]
+    if (!map.has(id)) {
+      map.set(id, { documentId: id })
+    }
+  }
+  for (const match of kramdown.matchAll(BLOCK_REFERENCE_PATTERN)) {
+    const id = match[1]
+    const anchor = match[2]
+    const existing = map.get(id)
+    if (!existing) {
+      map.set(id, { documentId: id, anchorText: anchor || undefined })
+    } else if (!existing.anchorText && anchor) {
+      existing.anchorText = anchor
+    }
+  }
+  return [...map.values()]
+}
+
+export async function fetchOutboundBlockRefDocumentIds(documentId: string): Promise<ExtractedDocRef[]> {
   const escapedId = documentId.replace(/'/g, "''")
   const rows = await sql(
-    `SELECT DISTINCT r.def_block_root_id AS documentId
+    `SELECT DISTINCT r.def_block_root_id AS documentId,
+            b.content AS title
      FROM refs r
+     LEFT JOIN blocks b ON b.id = r.def_block_root_id AND b.type = 'd'
      WHERE r.type = 'ref_id'
        AND r.root_id = '${escapedId}'
        AND r.def_block_root_id != '${escapedId}'`
-  ) as Array<{ documentId: string }>
-  return rows.map(row => row.documentId)
+  ) as Array<{ documentId: string; title: string | null }>
+  return rows.map(row => ({
+    documentId: row.documentId,
+    anchorText: row.title || undefined,
+  }))
 }
 
 export function buildLinkAssociations(params: {
@@ -49,9 +69,10 @@ export function buildLinkAssociations(params: {
   childDocumentMap?: Map<string, DocumentRecord>
   now: Date
   timeRange: TimeRange
-  extraOutboundDocumentIds?: string[]
+  extraOutboundRefs?: ExtractedDocRef[]
 }): LinkAssociations {
   const outboundTargets = new Set<string>()
+  const extraTitleMap = new Map<string, string>()
   const inboundSources = new Set<string>()
   const filteredReferences = filterReferencesByTimeRange({
     references: params.references,
@@ -74,10 +95,13 @@ export function buildLinkAssociations(params: {
     }
   }
 
-  if (params.extraOutboundDocumentIds) {
-    for (const targetId of params.extraOutboundDocumentIds) {
-      if (targetId === params.documentId) continue
-      outboundTargets.add(targetId)
+  if (params.extraOutboundRefs) {
+    for (const ref of params.extraOutboundRefs) {
+      if (ref.documentId === params.documentId) continue
+      outboundTargets.add(ref.documentId)
+      if (ref.anchorText) {
+        extraTitleMap.set(ref.documentId, ref.anchorText)
+      }
     }
   }
 
@@ -89,6 +113,7 @@ export function buildLinkAssociations(params: {
     overlap,
     direction: 'outbound',
     includeMissing: true,
+    extraTitleMap,
   })
   const inbound = buildAssociationList({
     documentIds: inboundSources,
@@ -111,15 +136,17 @@ function buildAssociationList(params: {
   overlap: Set<string>
   direction: LinkAssociationItem['direction']
   includeMissing?: boolean
+  extraTitleMap?: Map<string, string>
 }): LinkAssociationItem[] {
   return [...params.documentIds]
     .map((documentId) => {
       const document = params.documentMap.get(documentId)
       if (!document) {
         if (params.includeMissing) {
+          const title = params.extraTitleMap?.get(documentId) || documentId
           return {
             documentId,
-            title: documentId,
+            title,
             direction: params.direction,
             isOverlap: params.overlap.has(documentId),
           }

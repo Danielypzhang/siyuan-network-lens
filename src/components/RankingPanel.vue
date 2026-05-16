@@ -251,7 +251,7 @@
 
 <script setup lang="ts">
 import type { RankingDetailItem } from '@/analytics/summary-details'
-import type { LinkAssociations } from '@/analytics/link-associations'
+import type { LinkAssociations, ExtractedDocRef } from '@/analytics/link-associations'
 import { extractKramdownDocumentIds, fetchOutboundBlockRefDocumentIds } from '@/analytics/link-associations'
 import type { LinkDirection } from '@/analytics/link-sync'
 import type { WikiPreviewState } from '@/composables/use-analytics'
@@ -317,48 +317,52 @@ const emit = defineEmits<{
   (e: 'addTag', documentId: string, tag?: string): void
 }>()
 
-const extraOutboundDocIdsMap = ref<Record<string, string[]>>({})
+const extraOutboundRefsMap = ref<Record<string, ExtractedDocRef[]>>({})
 
 async function handleToggleLinkPanel(documentId: string) {
   props.toggleLinkPanel(documentId)
   if (!props.isLinkPanelExpanded(documentId)) {
-    const next = { ...extraOutboundDocIdsMap.value }
+    const next = { ...extraOutboundRefsMap.value }
     delete next[documentId]
-    extraOutboundDocIdsMap.value = next
+    extraOutboundRefsMap.value = next
     return
   }
-  if (documentId in extraOutboundDocIdsMap.value) return
+  if (documentId in extraOutboundRefsMap.value) return
 
-  const allIds = new Set<string>()
+  const merged = new Map<string, ExtractedDocRef>()
 
   try {
-    const docIds = await fetchOutboundBlockRefDocumentIds(documentId)
-    console.log('[NetworkLens] SQL refs:', documentId, '→', docIds)
-    for (const id of docIds) allIds.add(id)
-  } catch (e) {
-    console.warn('[NetworkLens] SQL refs failed:', e)
+    const refs = await fetchOutboundBlockRefDocumentIds(documentId)
+    for (const ref of refs) {
+      merged.set(ref.documentId, ref)
+    }
+  } catch {
+    // SQL failed, continue with kramdown fallback
   }
 
   if (props.getBlockKramdown) {
     try {
       const { kramdown } = await props.getBlockKramdown(documentId)
-      const kramdownIds = extractKramdownDocumentIds(kramdown)
-      console.log('[NetworkLens] kramdown scan:', documentId, '→', kramdownIds)
-      for (const id of kramdownIds) allIds.add(id)
-    } catch (e) {
-      console.warn('[NetworkLens] kramdown failed:', e)
+      const kramdownRefs = extractKramdownDocumentIds(kramdown)
+      for (const ref of kramdownRefs) {
+        const existing = merged.get(ref.documentId)
+        if (!existing) {
+          merged.set(ref.documentId, ref)
+        } else if (!existing.anchorText && ref.anchorText) {
+          existing.anchorText = ref.anchorText
+        }
+      }
+    } catch {
+      // kramdown failed
     }
   }
 
-  const merged = [...allIds]
-  console.log('[NetworkLens] merged extraOutboundIds:', documentId, '→', merged)
-  extraOutboundDocIdsMap.value = { ...extraOutboundDocIdsMap.value, [documentId]: merged }
+  extraOutboundRefsMap.value = { ...extraOutboundRefsMap.value, [documentId]: [...merged.values()] }
 }
 
 function resolveAssociations(documentId: string): LinkAssociations {
-  const extraOutboundDocumentIds = extraOutboundDocIdsMap.value[documentId]
-  const associations = props.resolveLinkAssociations(documentId, extraOutboundDocumentIds)
-  console.log('[NetworkLens] resolveAssociations:', documentId, 'extra:', extraOutboundDocumentIds, '→ outbound:', associations.outbound.length)
+  const extraOutboundRefs = extraOutboundRefsMap.value[documentId]
+  const associations = props.resolveLinkAssociations(documentId, extraOutboundRefs)
   return {
     outbound: associations.outbound ?? [],
     inbound: associations.inbound ?? [],

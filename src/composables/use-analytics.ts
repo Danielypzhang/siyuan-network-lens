@@ -40,7 +40,7 @@ import {
   countSelectedSummaryItems,
   type PathScope,
 } from './use-analytics-derived'
-import { buildLinkAssociations } from '@/analytics/link-associations'
+import { buildLinkAssociations, type ExtractedDocRef } from '@/analytics/link-associations'
 import {
   createAiSuggestionActions,
   createLinkAssociationInteractions,
@@ -815,8 +815,8 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
     persistSummaryCardOrder(nextOrder)
   }
 
-  function resolveLinkAssociations(documentId: string, extraOutboundDocumentIds?: string[]) {
-    if (!extraOutboundDocumentIds || extraOutboundDocumentIds.length === 0) {
+  function resolveLinkAssociations(documentId: string, extraOutboundRefs?: ExtractedDocRef[]) {
+    if (!extraOutboundRefs || extraOutboundRefs.length === 0) {
       const cached = linkAssociationsByDocumentId.value.get(documentId)
       if (cached) return cached
     }
@@ -830,7 +830,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
       childDocumentMap: associationDocumentMap.value,
       now: analysisNow.value,
       timeRange: timeRange.value,
-      extraOutboundDocumentIds,
+      extraOutboundRefs,
     })
   }
 

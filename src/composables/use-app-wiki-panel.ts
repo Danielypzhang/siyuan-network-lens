@@ -70,13 +70,13 @@ export function createAppWikiPanelController(params: {
     const allRefIds = new Set<string>()
 
     try {
-      const blockRefDocIds = await fetchOutboundBlockRefDocumentIds(documentId)
-      for (const refId of blockRefDocIds) {
-        if (!sourceDocumentLinkTypes.has(refId)) {
-          pushLinkType(sourceDocumentLinkTypes, refId, 'outbound')
-          sourceDocumentIds.push(refId)
+      const blockRefDocs = await fetchOutboundBlockRefDocumentIds(documentId)
+      for (const ref of blockRefDocs) {
+        allRefIds.add(ref.documentId)
+        if (!sourceDocumentLinkTypes.has(ref.documentId)) {
+          pushLinkType(sourceDocumentLinkTypes, ref.documentId, 'outbound')
+          sourceDocumentIds.push(ref.documentId)
         }
-        allRefIds.add(refId)
       }
     } catch {
       // SQL failed, continue with kramdown fallback
@@ -85,11 +85,11 @@ export function createAppWikiPanelController(params: {
     if (params.getBlockKramdown) {
       try {
         const { kramdown } = await params.getBlockKramdown(documentId)
-        const kramdownIds = extractKramdownDocumentIds(kramdown)
-        for (const refId of kramdownIds) {
-          if (!allRefIds.has(refId) && !sourceDocumentLinkTypes.has(refId)) {
-            pushLinkType(sourceDocumentLinkTypes, refId, 'outbound')
-            sourceDocumentIds.push(refId)
+        const kramdownRefs = extractKramdownDocumentIds(kramdown)
+        for (const ref of kramdownRefs) {
+          if (!allRefIds.has(ref.documentId) && !sourceDocumentLinkTypes.has(ref.documentId)) {
+            pushLinkType(sourceDocumentLinkTypes, ref.documentId, 'outbound')
+            sourceDocumentIds.push(ref.documentId)
           }
         }
       } catch {
