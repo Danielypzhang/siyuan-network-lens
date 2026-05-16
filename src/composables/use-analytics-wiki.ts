@@ -120,6 +120,7 @@ export async function buildWikiSourceProfileMap(params: {
   getChildBlocks?: GetChildBlocksFn
   getBlockKramdown?: GetBlockKramdownFn
   generatedAt: string
+  blockRefIds?: Set<string>
 }) {
   if (!params.aiIndexStore || !params.forwardProxy || !params.getChildBlocks || !params.getBlockKramdown) {
     throw new Error('Wiki topic bundle requires AI document index dependencies')
@@ -142,6 +143,7 @@ export async function buildWikiSourceProfileMap(params: {
           getBlockKramdown: params.getBlockKramdown,
           updatedAt: params.generatedAt,
           force: attempt > 0,
+          isBlockLevelRef: params.blockRefIds?.has(document.id),
         })
         ensured = true
         break

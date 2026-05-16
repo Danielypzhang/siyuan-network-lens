@@ -93,6 +93,7 @@ export async function ensureDocumentIndex(params: {
   getBlockKramdown: GetBlockKramdownFn
   force?: boolean
   updatedAt?: string
+  isBlockLevelRef?: boolean
 }): Promise<{ fromCache: boolean, updatedAt: string }> {
   const sourceUpdatedAt = params.sourceDocument.updated ?? ''
 
@@ -116,6 +117,7 @@ export async function ensureDocumentIndex(params: {
     documentId: params.sourceDocument.id,
     getChildBlocks: params.getChildBlocks,
     getBlockKramdown: params.getBlockKramdown,
+    isBlockLevelRef: params.isBlockLevelRef,
   })
 
   const result = await requestEvidenceCompilation({

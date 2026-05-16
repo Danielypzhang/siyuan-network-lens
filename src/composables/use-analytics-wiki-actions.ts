@@ -147,11 +147,13 @@ export function createAnalyticsWikiActionsController(params: {
 
       const associationMap = new Map(params.associationDocumentMap.value)
       const missingIds = (request.sourceDocumentIds ?? []).filter(id => !associationMap.has(id))
+      const blockRefIds = new Set<string>()
       if (missingIds.length > 0) {
         try {
           const blockRecords = await fetchBlockDocumentRecords(missingIds)
           for (const [id, record] of blockRecords) {
             associationMap.set(id, record)
+            blockRefIds.add(id)
           }
         } catch {
           // block lookup failed, continue without them
@@ -178,6 +180,7 @@ export function createAnalyticsWikiActionsController(params: {
         getChildBlocks: params.getChildBlocks,
         getBlockKramdown: params.getBlockKramdown,
         generatedAt,
+        blockRefIds,
       })
       const sourceProfileMap = sourceProfileResult.profileMap
       const effectiveSourceDocuments = sourceProfileResult.effectiveDocuments

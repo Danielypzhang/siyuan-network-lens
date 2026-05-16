@@ -33,7 +33,25 @@ export async function collectDocumentSourceBlocks(params: {
   documentId: string
   getChildBlocks: (id: string) => Promise<Array<{ id: string, type?: string, subtype?: string }>>
   getBlockKramdown: (id: string) => Promise<{ id: string, kramdown: string }>
+  isBlockLevelRef?: boolean
 }): Promise<ClassifiedSourceBlocks> {
+  if (params.isBlockLevelRef) {
+    try {
+      const { kramdown } = await params.getBlockKramdown(params.documentId)
+      const plainText = stripKramdownMarkers(kramdown)
+      if (plainText && plainText.length >= SECONDARY_CHAR_THRESHOLD) {
+        const isPrimary = plainText.length >= PRIMARY_CHAR_THRESHOLD
+        return {
+          primary: isPrimary ? [{ blockId: params.documentId, text: plainText }] : [],
+          secondary: isPrimary ? [] : [{ blockId: params.documentId, text: plainText }],
+        }
+      }
+    } catch {
+      // block kramdown failed
+    }
+    return { primary: [], secondary: [] }
+  }
+
   const childBlocks = await params.getChildBlocks(params.documentId)
 
   if (childBlocks.length === 0) {
