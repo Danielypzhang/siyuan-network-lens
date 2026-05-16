@@ -107,6 +107,7 @@ export interface PluginConfig {
   wikiMaintenancePromptVersion?: number
   wikiHallucinationMarkingEnabled?: boolean
   wikiSourceCitationMode?: WikiSourceCitationMode
+  wikiBatchSize?: number
   summaryCardOrder?: string[]
 }
 
@@ -150,6 +151,7 @@ export const DEFAULT_CONFIG: PluginConfig = {
   wikiMaintenancePromptVersion: CURRENT_WIKI_PROMPT_VERSION,
   wikiHallucinationMarkingEnabled: true,
   wikiSourceCitationMode: 'inline',
+  wikiBatchSize: 0,
   summaryCardOrder: undefined,
 }
 
@@ -293,6 +295,9 @@ export function ensureConfigDefaults(config: PluginConfig) {
   }
   if (typeof config.wikiSourceCitationMode !== 'string' || !WIKI_SOURCE_CITATION_MODES.includes(config.wikiSourceCitationMode as WikiSourceCitationMode)) {
     config.wikiSourceCitationMode = 'inline'
+  }
+  if (typeof config.wikiBatchSize !== 'number' || config.wikiBatchSize < 0) {
+    config.wikiBatchSize = 0
   }
   ensureAiProviderConfigState(config)
 }

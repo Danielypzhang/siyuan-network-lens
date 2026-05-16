@@ -163,6 +163,17 @@
           </select>
           <span class="setting-field__hint">{{ t('settings.wiki.generationModeDescription') }}</span>
         </div>
+        <div v-if="showWikiSettings" class="setting-field setting-field--full">
+          <span>{{ t('settings.wiki.batchSize') }}</span>
+          <select v-model.number="config.wikiBatchSize">
+            <option :value="0">{{ t('settings.wiki.generationModeFull') }} (All)</option>
+            <option :value="1">1</option>
+            <option :value="2">2</option>
+            <option :value="3">3</option>
+            <option :value="5">5</option>
+          </select>
+          <span class="setting-field__hint">{{ t('settings.wiki.batchSizeDescription') }}</span>
+        </div>
         <label v-if="showWikiSettings" class="setting-item setting-item--full">
           <span class="setting-item__text">
             <strong>{{ t('settings.wiki.hallucinationMarking') }}</strong>

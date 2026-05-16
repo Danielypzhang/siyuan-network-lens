@@ -41,6 +41,7 @@ type AiConfig = Pick<
   | 'wikiMaintenancePrompt'
   | 'wikiHallucinationMarkingEnabled'
   | 'wikiSourceCitationMode'
+  | 'wikiBatchSize'
 >
 
 type ChatCompletionMessage = { role: 'system' | 'user' | 'assistant', content: string }

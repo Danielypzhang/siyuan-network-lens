@@ -522,6 +522,14 @@ const UI_TEXT = {
         en_US: 'Both',
         zh_CN: '两者同时',
       },
+      batchSize: {
+        en_US: 'Documents per AI request',
+        zh_CN: '每次 AI 请求发送文档数',
+      },
+      batchSizeDescription: {
+        en_US: 'Number of source documents sent per AI call. 0 = send all at once. 1 = send one document at a time (iterative update). 2-5 = send in small batches. Lower values reduce token usage but increase AI calls.',
+        zh_CN: '每次 AI 调用发送的源文档数量。0 = 一次性发送全部。1 = 逐个发送（循环更新）。2-5 = 小批量发送。数值越小 token 消耗越低，但 AI 调用次数越多。',
+      },
     },
   },
   summaryDetail: {
