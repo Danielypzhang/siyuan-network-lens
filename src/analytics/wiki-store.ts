@@ -67,6 +67,16 @@ export function createAiWikiStore(storage: PluginStorageLike): AiWikiStore {
       return record
     },
     async savePageRecord(record) {
+      console.info('[NetworkLens][WikiStore] savePageRecord called:', {
+        pageType: record.pageType,
+        pageTitle: record.pageTitle,
+        themeDocumentId: record.themeDocumentId,
+        hasTimestamps: Boolean(record.sourceDocumentTimestamps),
+        timestampKeys: record.sourceDocumentTimestamps ? Object.keys(record.sourceDocumentTimestamps) : [],
+        sourceDocumentIdsCount: record.sourceDocumentIds?.length ?? 0,
+        sourceDocumentIds: record.sourceDocumentIds,
+      })
+
       const snapshot = await loadSnapshot(storage)
       const pageKey = buildWikiPageStorageKey({
         pageType: record.pageType,
@@ -75,12 +85,20 @@ export function createAiWikiStore(storage: PluginStorageLike): AiWikiStore {
       })
       console.info('[NetworkLens][WikiStore] savePageRecord:', {
         pageKey,
-        hasTimestamps: Boolean(record.sourceDocumentTimestamps),
-        timestampKeys: record.sourceDocumentTimestamps ? Object.keys(record.sourceDocumentTimestamps) : [],
-        sourceDocumentIds: record.sourceDocumentIds,
+        existingKeys: Object.keys(snapshot.pages),
+        snapshotSchemaVersion: snapshot.schemaVersion,
       })
       snapshot.pages[pageKey] = normalizePageRecord(record)
+
+      const normalizedRecord = snapshot.pages[pageKey]
+      console.info('[NetworkLens][WikiStore] savePageRecord after normalize:', {
+        pageKey,
+        normalizedHasTimestamps: Boolean(normalizedRecord.sourceDocumentTimestamps),
+        normalizedTimestampKeys: normalizedRecord.sourceDocumentTimestamps ? Object.keys(normalizedRecord.sourceDocumentTimestamps) : [],
+      })
+
       await saveSnapshot(storage, snapshot)
+      console.info('[NetworkLens][WikiStore] savePageRecord completed:', { pageKey })
     },
 
     async deletePageRecord(pageKey) {
