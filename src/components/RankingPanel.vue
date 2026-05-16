@@ -252,7 +252,7 @@
 <script setup lang="ts">
 import type { RankingDetailItem } from '@/analytics/summary-details'
 import type { LinkAssociations, ExtractedDocRef } from '@/analytics/link-associations'
-import { extractKramdownDocumentIds, fetchOutboundBlockRefDocumentIds } from '@/analytics/link-associations'
+import { fetchOutboundBlockRefDocRefs, fetchKramdownOutboundDocRefs } from '@/analytics/link-associations'
 import type { LinkDirection } from '@/analytics/link-sync'
 import type { WikiPreviewState } from '@/composables/use-analytics'
 import { ref } from 'vue'
@@ -332,7 +332,7 @@ async function handleToggleLinkPanel(documentId: string) {
   const merged = new Map<string, ExtractedDocRef>()
 
   try {
-    const refs = await fetchOutboundBlockRefDocumentIds(documentId)
+    const refs = await fetchOutboundBlockRefDocRefs(documentId)
     for (const ref of refs) {
       merged.set(ref.documentId, ref)
     }
@@ -343,7 +343,7 @@ async function handleToggleLinkPanel(documentId: string) {
   if (props.getBlockKramdown) {
     try {
       const { kramdown } = await props.getBlockKramdown(documentId)
-      const kramdownRefs = extractKramdownDocumentIds(kramdown)
+      const kramdownRefs = await fetchKramdownOutboundDocRefs(kramdown)
       for (const ref of kramdownRefs) {
         const existing = merged.get(ref.documentId)
         if (!existing) {

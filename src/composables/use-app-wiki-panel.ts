@@ -1,6 +1,6 @@
 import { ref, type ComputedRef } from 'vue'
 
-import { extractKramdownDocumentIds, fetchOutboundBlockRefDocumentIds } from '@/analytics/link-associations'
+import { fetchOutboundBlockRefDocRefs, fetchKramdownOutboundDocRefs } from '@/analytics/link-associations'
 import { buildSiyuanBlockLinkMarkdown } from '@/analytics/link-sync'
 import { normalizeWikiSourceDocLinkTypes, type WikiSourceDocLinkType } from '@/analytics/wiki-source-docs'
 import { t } from '@/i18n/ui'
@@ -70,7 +70,7 @@ export function createAppWikiPanelController(params: {
     const allRefIds = new Set<string>()
 
     try {
-      const blockRefDocs = await fetchOutboundBlockRefDocumentIds(documentId)
+      const blockRefDocs = await fetchOutboundBlockRefDocRefs(documentId)
       for (const ref of blockRefDocs) {
         allRefIds.add(ref.documentId)
         if (!sourceDocumentLinkTypes.has(ref.documentId)) {
@@ -85,7 +85,7 @@ export function createAppWikiPanelController(params: {
     if (params.getBlockKramdown) {
       try {
         const { kramdown } = await params.getBlockKramdown(documentId)
-        const kramdownRefs = extractKramdownDocumentIds(kramdown)
+        const kramdownRefs = await fetchKramdownOutboundDocRefs(kramdown)
         for (const ref of kramdownRefs) {
           if (!allRefIds.has(ref.documentId) && !sourceDocumentLinkTypes.has(ref.documentId)) {
             pushLinkType(sourceDocumentLinkTypes, ref.documentId, 'outbound')
