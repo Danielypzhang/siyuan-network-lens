@@ -542,6 +542,34 @@ const UI_TEXT = {
         en_US: '{processed} documents processed, {remaining} documents pending. Run Wiki maintenance again to continue.',
         zh_CN: '已处理 {processed} 个文档，剩余 {remaining} 个文档待处理。可再次点击维护 Wiki 继续。',
       },
+      templatePrompts: {
+        en_US: 'Template Prompts',
+        zh_CN: '模板提示词',
+      },
+      templatePromptsDescription: {
+        en_US: 'Configure prompts for different template types, built-in defaults used when not configured',
+        zh_CN: '为不同模板类型配置专属提示词，未配置时使用内置默认',
+      },
+      resetToDefault: {
+        en_US: 'Reset to Default',
+        zh_CN: '重置为默认',
+      },
+      templateTypeTechTopic: {
+        en_US: 'Tech Topic',
+        zh_CN: '技术主题',
+      },
+      templateTypeProductHowto: {
+        en_US: 'Product How-to',
+        zh_CN: '产品操作指南',
+      },
+      templateTypeSocialTopic: {
+        en_US: 'Social Topic',
+        zh_CN: '社会话题',
+      },
+      templateTypeMediaList: {
+        en_US: 'Media List',
+        zh_CN: '媒体清单',
+      },
     },
   },
   summaryDetail: {
@@ -1291,6 +1319,26 @@ const UI_TEXT = {
       en_US: 'No doc-level reference relationships matched the current filters.',
       zh_CN: '当前筛选下没有命中文档级引用关系。',
     },
+    themeEditPrompt: {
+      en_US: 'Edit Prompt',
+      zh_CN: '编辑提示词',
+    },
+    themePromptDialogTitle: {
+      en_US: 'Theme Prompt',
+      zh_CN: '主题提示词',
+    },
+    themePromptDialogReference: {
+      en_US: 'Current Template Prompt Reference',
+      zh_CN: '当前模板提示词参考',
+    },
+    themePromptDialogSave: {
+      en_US: 'Save',
+      zh_CN: '保存',
+    },
+    themePromptDialogClear: {
+      en_US: 'Clear',
+      zh_CN: '清除',
+    },
   },
   wikiMaintain: {
     title: {
@@ -1727,8 +1775,8 @@ const UI_TEXT = {
         zh_CN: '请只返回 JSON，并包含 templateType、confidence、reason、enabledModules、suppressedModules、evidenceSummary。',
       },
       planThemePagePrompt: {
-        en_US: 'Generate a wiki page plan from the diagnosis for the current theme. Theme: {theme}.',
-        zh_CN: '请基于模板诊断结果规划主题 wiki 页面结构。主题：{theme}。',
+        en_US: 'Generate a wiki page plan from the diagnosis for the current theme. Theme: {theme}. Dynamically choose the most appropriate section combination based on content volume and topic nature — you may select a concise set (e.g. 3–4 sections) or a richer set (e.g. 5–7 sections). Do NOT always include all shared sections; pick only the sections that best serve the topic. The "sources" section must always be the last section in sectionOrder.',
+        zh_CN: '请基于模板诊断结果规划主题 wiki 页面结构。主题：{theme}。请根据内容量和主题性质动态选择最合适的章节组合——可以选择精简组合（如 3–4 个章节）或丰富组合（如 5–7 个章节），不要固定包含所有共享章节，只选择最适合该主题的章节。"sources" 章节必须始终作为 sectionOrder 的最后一个章节。',
       },
       planThemePageSchemaPrompt: {
         en_US: 'Return JSON only with templateType, confidence, coreSections, optionalSections, sectionOrder, sectionGoals, and sectionFormats.',
@@ -3086,6 +3134,32 @@ const UI_TEXT = {
         en_US: 'Archive dormant',
         zh_CN: '归档沉没',
       },
+    },
+  },
+  wikiChat: {
+    activeModeTitle: {
+      en_US: 'Document Q&A - {title}',
+      zh_CN: '{title} - 文档问答',
+    },
+    zoomedIn: {
+      en_US: 'Zoomed In',
+      zh_CN: '聚焦模式',
+    },
+    appendToWiki: {
+      en_US: 'Append to Wiki',
+      zh_CN: '追加到 Wiki',
+    },
+    appendToWikiSuccess: {
+      en_US: 'Appended to Wiki manual notes',
+      zh_CN: '已追加到 Wiki 人工备注区',
+    },
+    appendToWikiFailed: {
+      en_US: 'Append failed, no matching Wiki page found',
+      zh_CN: '追加失败，未找到对应 Wiki 页面',
+    },
+    activeDocChat: {
+      en_US: 'AI Q&A',
+      zh_CN: 'AI 问答',
     },
   },
   llmWiki: {

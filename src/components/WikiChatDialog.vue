@@ -21,11 +21,14 @@ const props = defineProps<{
     aiMaxContextMessages?: number
     enableConsoleLogging?: boolean
   }
+  wikiStore?: { getPageRecord: (pageKey: string) => Promise<{ pageId?: string, sourceDocumentIds?: string[] } | null> }
+  updateBlock?: (dataType: 'markdown' | 'dom', data: string, id: string) => Promise<any>
 }>()
 
 const emit = defineEmits<{
   close: []
   save: [markdown: string]
+  appendToWikiResult: [success: boolean]
 }>()
 
 const logger = createPluginLogger(() => props.config.enableConsoleLogging === true)
@@ -233,6 +236,35 @@ onBeforeUnmount(() => {
 })
 
 const rootRef = ref<HTMLElement>()
+
+const isActiveMode = computed(() => props.scope.mode === 'active' && !!props.scope.activeContent)
+const headerTitle = computed(() => {
+  if (isActiveMode.value && props.scope.activeContent) {
+    return t('wikiChat.activeModeTitle', { title: props.scope.activeContent.title })
+  }
+  return t('llmWiki.chat.chatTitle')
+})
+const showZoomBadge = computed(() => isActiveMode.value && props.scope.activeContent?.isZoomedIn)
+const canAppendToWiki = computed(() => isActiveMode.value && !!props.wikiStore && !!props.updateBlock && session.messages.some(m => m.role === 'assistant'))
+
+const appendToWikiLoading = ref(false)
+
+async function handleAppendToWiki() {
+  if (!props.wikiStore || !props.updateBlock) return
+  appendToWikiLoading.value = true
+  try {
+    const success = await chatSession.appendChatToWiki({
+      wikiStore: props.wikiStore,
+      getBlockKramdown: props.getBlockKramdown,
+      updateBlock: props.updateBlock,
+    })
+    emit('appendToWikiResult', success)
+  } catch {
+    emit('appendToWikiResult', false)
+  } finally {
+    appendToWikiLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -252,7 +284,11 @@ const rootRef = ref<HTMLElement>()
       class="wiki-chat-dialog__header"
       @mousedown="onDragStart"
     >
-      <h3>{{ t('llmWiki.chat.chatTitle') }}</h3>
+      <h3>{{ headerTitle }}</h3>
+      <span
+        v-if="showZoomBadge"
+        class="wiki-chat-dialog__zoom-badge"
+      >{{ t('wikiChat.zoomedIn') }}</span>
       <button
         class="ghost-button"
         @click="emit('close')"
@@ -264,10 +300,10 @@ const rootRef = ref<HTMLElement>()
     <!-- Source Bar -->
     <div class="wiki-chat-dialog__source-bar">
       <span class="wiki-chat-dialog__source-tag">
-        {{ t('llmWiki.chat.sourceLabel') }}
+        {{ isActiveMode ? t('wikiChat.activeDocChat') : t('llmWiki.chat.sourceLabel') }}
       </span>
       <span class="wiki-chat-dialog__source-title">
-        {{ session.currentSourcePage?.title ?? t('llmWiki.chat.sourcePending') }}
+        {{ isActiveMode && props.scope.activeContent ? props.scope.activeContent.title : (session.currentSourcePage?.title ?? t('llmWiki.chat.sourcePending')) }}
       </span>
     </div>
 
@@ -404,6 +440,14 @@ const rootRef = ref<HTMLElement>()
       class="wiki-chat-dialog__footer"
     >
       <button
+        v-if="canAppendToWiki"
+        class="ghost-button"
+        :disabled="appendToWikiLoading"
+        @click="handleAppendToWiki"
+      >
+        {{ appendToWikiLoading ? t('llmWiki.chat.thinking') : t('wikiChat.appendToWiki') }}
+      </button>
+      <button
         class="action-button"
         @click="handleSave"
       >
@@ -450,6 +494,16 @@ const rootRef = ref<HTMLElement>()
 .wiki-chat-dialog__header h3 {
   margin: 0;
   font-size: 1em;
+}
+
+.wiki-chat-dialog__zoom-badge {
+  background: color-mix(in srgb, var(--accent-cool) 18%, transparent);
+  color: color-mix(in srgb, var(--accent-cool) 80%, var(--b3-theme-on-background));
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 /* Source Bar */

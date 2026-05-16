@@ -29,8 +29,14 @@ export interface WikiIndexPage {
 }
 
 export interface WikiChatScope {
-  mode: 'topic' | 'document'
+  mode: 'topic' | 'document' | 'active'
   targetPage?: WikiIndexPage
+  activeContent?: {
+    documentId: string
+    title: string
+    content: string
+    isZoomedIn: boolean
+  }
 }
 
 export function resolveThemeDocumentIdFromTitle(

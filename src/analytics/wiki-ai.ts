@@ -4,7 +4,7 @@ import type { WikiThemeBundle } from './wiki-generation'
 import {
   WIKI_OPTIONAL_SECTION_TYPES,
   WIKI_SECTION_TYPES,
-  WIKI_SHARED_SECTION_TYPES,
+  WIKI_TEMPLATE_DEFAULT_SECTIONS,
   WIKI_TEMPLATE_TYPES,
   type WikiPagePlan,
   type WikiSectionDraft,
@@ -14,9 +14,11 @@ import {
   type WikiTemplateDiagnosis,
   type WikiTemplateType,
 } from './wiki-template-model'
+
+const SHARED_SECTION_TYPES = ['intro', 'highlights', 'sources'] as const
 import { resolveSectionOrder } from './wiki-template-selection'
 import { resolveUiLocale, t } from '@/i18n/ui'
-import type { PluginConfig } from '@/types/config'
+import { DEFAULT_WIKI_TEMPLATE_PROMPTS, type PluginConfig } from '@/types/config'
 
 type ForwardProxyFn = (
   url: string,
@@ -42,6 +44,7 @@ type AiConfig = Pick<
   | 'wikiHallucinationMarkingEnabled'
   | 'wikiSourceCitationMode'
   | 'wikiBatchSize'
+  | 'wikiTemplatePrompts'
 >
 
 type ChatCompletionMessage = { role: 'system' | 'user' | 'assistant', content: string }
@@ -52,6 +55,7 @@ export interface AiWikiService {
     payload: WikiThemeBundle
     existingWikiContent?: string
     isIncremental?: boolean
+    themePrompt?: string
   }) => Promise<WikiTemplateDiagnosis>
   planThemePage: (params: {
     config: AiConfig
@@ -59,6 +63,8 @@ export interface AiWikiService {
     diagnosis: WikiTemplateDiagnosis
     existingWikiContent?: string
     isIncremental?: boolean
+    themePrompt?: string
+    templateType?: string
   }) => Promise<WikiPagePlan>
   generateThemeSection: (params: {
     config: AiConfig
@@ -68,6 +74,8 @@ export interface AiWikiService {
     sectionType: WikiSectionType
     existingWikiContent?: string
     isIncremental?: boolean
+    themePrompt?: string
+    templateType?: string
   }) => Promise<WikiSectionDraft>
 }
 
@@ -103,7 +111,7 @@ const SOURCE_CITATION_PROMPT = [
   'For the sources (catalog) section, each block must reference all relevant source documentIds.',
 ].join(' ')
 
-function buildWikiSystemPrompt(config: AiConfig): string {
+function buildWikiSystemPrompt(config: AiConfig, themePrompt?: string, templateType?: string): string {
   const parts = [BASE_SYSTEM_PROMPT]
 
   if (config.wikiGenerationMode === 'full') {
@@ -118,11 +126,31 @@ function buildWikiSystemPrompt(config: AiConfig): string {
     parts.push(SOURCE_CITATION_PROMPT)
   }
 
-  if (config.wikiMaintenancePrompt?.trim()) {
+  const resolvedThemePrompt = resolveThemePrompt(config, themePrompt, templateType)
+  if (resolvedThemePrompt) {
+    parts.push(resolvedThemePrompt)
+  } else if (config.wikiMaintenancePrompt?.trim()) {
     parts.push(config.wikiMaintenancePrompt.trim())
   }
 
   return parts.join('\n\n')
+}
+
+function resolveThemePrompt(config: AiConfig, themePrompt?: string, templateType?: string): string | undefined {
+  if (themePrompt?.trim()) {
+    return themePrompt.trim()
+  }
+  if (templateType) {
+    const userOverride = config.wikiTemplatePrompts?.[templateType]?.trim()
+    if (userOverride) {
+      return userOverride
+    }
+    const builtIn = DEFAULT_WIKI_TEMPLATE_PROMPTS[templateType]?.trim()
+    if (builtIn) {
+      return builtIn
+    }
+  }
+  return undefined
 }
 
 function buildWikiUserPayload(params: {
@@ -271,7 +299,7 @@ export function createAiWikiService(deps: {
 
       const requestOptions = resolveAiRequestOptions(params.config)
       const systemPrompt = [
-        buildWikiSystemPrompt(params.config),
+        buildWikiSystemPrompt(params.config, params.themePrompt),
         'Diagnose the best wiki template for the current theme.',
         'The JSON must include templateType, confidence, reason, enabledModules, suppressedModules, and evidenceSummary.',
       ].join(' ')
@@ -311,7 +339,7 @@ export function createAiWikiService(deps: {
 
       const requestOptions = resolveAiRequestOptions(params.config)
       const systemPrompt = [
-        buildWikiSystemPrompt(params.config),
+        buildWikiSystemPrompt(params.config, params.themePrompt, params.templateType),
         'Generate a wiki page plan for the diagnosed theme template.',
         'The JSON must include templateType, confidence, coreSections, optionalSections, sectionOrder, sectionGoals, and sectionFormats.',
       ].join(' ')
@@ -353,7 +381,7 @@ export function createAiWikiService(deps: {
       const requestOptions = resolveAiRequestOptions(params.config)
       const systemPrompt = (() => {
         const parts = [
-          buildWikiSystemPrompt(params.config),
+          buildWikiSystemPrompt(params.config, params.themePrompt, params.templateType),
           'Generate exactly one wiki section draft.',
           'The JSON must include sectionType, title, format, blocks, and sourceRefs.',
           'Each block must include text and sourceRefs.',
@@ -537,11 +565,13 @@ function normalizeTemplateDiagnosis(value: any): WikiTemplateDiagnosis {
 function normalizePagePlan(value: any, diagnosis: WikiTemplateDiagnosis): WikiPagePlan {
   const templateType = isWikiTemplateType(value?.templateType) ? value.templateType : diagnosis.templateType
   const confidence = isWikiTemplateConfidence(value?.confidence) ? value.confidence : diagnosis.confidence
+  const templateDefaults = WIKI_TEMPLATE_DEFAULT_SECTIONS[templateType]
+  const defaultCoreSections = templateDefaults.filter(
+    (s): s is typeof SHARED_SECTION_TYPES[number] => SHARED_SECTION_TYPES.includes(s as typeof SHARED_SECTION_TYPES[number]),
+  )
   const coreSections = uniqueSharedSectionTypes([
-    'intro',
-    'highlights',
-    'sources',
-    ...normalizeSharedSectionList(value?.coreSections, ['intro', 'highlights', 'sources']),
+    ...defaultCoreSections,
+    ...normalizeSharedSectionList(value?.coreSections, defaultCoreSections),
   ])
   const rawOptionalSections = normalizeOptionalSectionList(
     value?.optionalSections,
@@ -550,6 +580,7 @@ function normalizePagePlan(value: any, diagnosis: WikiTemplateDiagnosis): WikiPa
     ),
   )
   const allowedSections = buildAllowedPagePlanSections({
+    templateType,
     enabledModules: diagnosis.enabledModules,
     suppressedModules: diagnosis.suppressedModules,
     optionalSections: rawOptionalSections,
@@ -575,6 +606,7 @@ function normalizePagePlan(value: any, diagnosis: WikiTemplateDiagnosis): WikiPa
       value?.sectionGoals,
       sectionOrder,
       fallbackUsed || sectionOrder.some(sectionType => !requestedOrder.includes(sectionType)),
+      templateType,
     ),
     sectionFormats: normalizeSectionFormatMap(value?.sectionFormats, sectionOrder),
   }
@@ -627,6 +659,7 @@ function normalizeSectionGoalMap(
   value: unknown,
   allowedSections: WikiSectionType[],
   includeFallbackSignal: boolean,
+  templateType: WikiTemplateType,
 ): WikiPagePlan['sectionGoals'] {
   const result: WikiPagePlan['sectionGoals'] = {}
 
@@ -644,8 +677,14 @@ function normalizeSectionGoalMap(
     }
   }
 
-  if (includeFallbackSignal && !result.intro) {
-    result.intro = t('analytics.wiki.pagePlanFallbackGoal')
+  if (includeFallbackSignal) {
+    const templateDefaults = WIKI_TEMPLATE_DEFAULT_SECTIONS[templateType]
+    const allowed = new Set(allowedSections)
+    for (const sectionType of templateDefaults) {
+      if (allowed.has(sectionType) && !result[sectionType]) {
+        result[sectionType] = t('analytics.wiki.pagePlanFallbackGoal')
+      }
+    }
   }
 
   return result
@@ -679,23 +718,25 @@ function normalizePlannedSectionOrder(
 ): WikiSectionType[] {
   const allowedSet = new Set(params.allowedSections)
   const filteredRequested = uniqueSectionTypes(requestedOrder.filter(sectionType => allowedSet.has(sectionType)))
-  const requiredSharedBase = WIKI_SHARED_SECTION_TYPES.filter(sectionType => allowedSet.has(sectionType))
 
-  if (
-    filteredRequested.length > 0
-    && requiredSharedBase.every(sectionType => filteredRequested.includes(sectionType))
-  ) {
-    return uniqueSectionTypes([
-      ...filteredRequested,
-      ...requiredSharedBase.filter(sectionType => !filteredRequested.includes(sectionType)),
-      ...params.allowedSections.filter(sectionType => !filteredRequested.includes(sectionType) && !WIKI_SHARED_SECTION_TYPES.includes(sectionType as typeof WIKI_SHARED_SECTION_TYPES[number])),
-    ])
+  if (filteredRequested.length > 0) {
+    const resolved = resolveSectionOrder({
+      templateType: params.templateType,
+      aiSectionOrder: filteredRequested,
+    })
+    const result = resolved.filter(sectionType => allowedSet.has(sectionType))
+    const resultSet = new Set(result)
+    if (allowedSet.has('intro') && !resultSet.has('intro')) {
+      result.unshift('intro')
+    }
+    if (allowedSet.has('sources') && !resultSet.has('sources')) {
+      result.push('sources')
+    }
+    return result
   }
 
   const fallbackOrder = resolveSectionOrder({
     templateType: params.templateType,
-    enabledModules: uniqueSectionTypes(params.allowedSections),
-    confidence: params.confidence,
   }).filter(sectionType => allowedSet.has(sectionType))
 
   return uniqueSectionTypes(fallbackOrder)
@@ -718,21 +759,18 @@ function prefixFallback(value: string): string {
 }
 
 function buildAllowedPagePlanSections(params: {
+  templateType: WikiTemplateType
   enabledModules: WikiSectionType[]
   suppressedModules: WikiSectionType[]
   optionalSections: typeof WIKI_OPTIONAL_SECTION_TYPES[number][]
 }): WikiSectionType[] {
-  const suppressed = new Set(params.suppressedModules.filter(sectionType => !isWikiSharedSectionType(sectionType)))
-  const enabledOptionalSections = params.enabledModules.filter((item): item is typeof WIKI_OPTIONAL_SECTION_TYPES[number] =>
-    isWikiOptionalSectionType(item),
-  )
+  const suppressed = new Set<WikiSectionType>(params.suppressedModules.filter(sectionType => !isWikiSharedSectionType(sectionType)))
+  const templateDefaults = WIKI_TEMPLATE_DEFAULT_SECTIONS[params.templateType]
 
   return uniqueSectionTypes([
-    'intro',
-    'highlights',
-    ...enabledOptionalSections,
+    ...templateDefaults,
+    ...params.enabledModules,
     ...params.optionalSections,
-    'sources',
   ]).filter(sectionType => !suppressed.has(sectionType))
 }
 
@@ -756,8 +794,8 @@ function normalizeSectionTypeList(value: unknown, fallback: WikiSectionType[]): 
 
 function normalizeSharedSectionList(
   value: unknown,
-  fallback: typeof WIKI_SHARED_SECTION_TYPES[number][],
-): typeof WIKI_SHARED_SECTION_TYPES[number][] {
+  fallback: typeof SHARED_SECTION_TYPES[number][],
+): typeof SHARED_SECTION_TYPES[number][] {
   if (!Array.isArray(value)) {
     return uniqueSharedSectionTypes(fallback)
   }
@@ -786,7 +824,7 @@ function uniqueSectionTypes(values: WikiSectionType[]): WikiSectionType[] {
   return [...new Set(values)]
 }
 
-function uniqueSharedSectionTypes(values: typeof WIKI_SHARED_SECTION_TYPES[number][]) {
+function uniqueSharedSectionTypes(values: typeof SHARED_SECTION_TYPES[number][]) {
   return [...new Set(values)]
 }
 
@@ -856,8 +894,8 @@ function isWikiSectionType(value: unknown): value is WikiSectionType {
   return typeof value === 'string' && WIKI_SECTION_TYPES.includes(value as WikiSectionType)
 }
 
-function isWikiSharedSectionType(value: unknown): value is typeof WIKI_SHARED_SECTION_TYPES[number] {
-  return typeof value === 'string' && WIKI_SHARED_SECTION_TYPES.includes(value as typeof WIKI_SHARED_SECTION_TYPES[number])
+function isWikiSharedSectionType(value: unknown): value is typeof SHARED_SECTION_TYPES[number] {
+  return typeof value === 'string' && SHARED_SECTION_TYPES.includes(value as typeof SHARED_SECTION_TYPES[number])
 }
 
 function isWikiOptionalSectionType(value: unknown): value is typeof WIKI_OPTIONAL_SECTION_TYPES[number] {

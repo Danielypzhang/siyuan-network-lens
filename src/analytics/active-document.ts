@@ -15,14 +15,31 @@ export function resolveProtyleDocumentId(protyle?: IProtyle | null): string {
   return protyle.block?.rootID || protyle.block?.id || protyle.id || ''
 }
 
+export function resolveProtyleZoomBlockId(protyle?: IProtyle | null): { blockId: string, isZoomedIn: boolean } | null {
+  if (!protyle?.block) {
+    return null
+  }
+  const blockId = protyle.block.id
+  const rootId = protyle.block.rootID
+  if (!blockId || !rootId) {
+    return null
+  }
+  const isZoomedIn = blockId !== rootId
+  return { blockId: isZoomedIn ? blockId : rootId, isZoomedIn }
+}
+
 export function createActiveDocumentSync(params: {
   eventBus: Pick<EventBus, 'on' | 'off'>
   onDocumentId: (documentId: string) => void
+  onZoomBlockId?: (result: { blockId: string, isZoomedIn: boolean } | null) => void
 }) {
   const handler = (event: { detail?: { protyle?: IProtyle } }) => {
     const documentId = resolveProtyleDocumentId(event.detail?.protyle)
     if (documentId) {
       params.onDocumentId(documentId)
+    }
+    if (params.onZoomBlockId) {
+      params.onZoomBlockId(resolveProtyleZoomBlockId(event.detail?.protyle))
     }
   }
 

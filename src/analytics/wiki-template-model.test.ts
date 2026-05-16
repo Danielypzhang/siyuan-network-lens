@@ -3,7 +3,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   WIKI_OPTIONAL_SECTION_TYPES,
   WIKI_SECTION_TYPES,
-  WIKI_SHARED_SECTION_TYPES,
+  WIKI_TEMPLATE_DEFAULT_SECTIONS,
   WIKI_TEMPLATE_TYPES,
   type WikiPagePlan,
   type WikiOptionalSectionType,
@@ -22,7 +22,6 @@ describe('wiki template model', () => {
       'social_topic',
       'media_list',
     ])
-    expect(WIKI_SHARED_SECTION_TYPES).toEqual(['intro', 'highlights', 'sources'])
     expect(WIKI_OPTIONAL_SECTION_TYPES).toEqual([
       'core_principles',
       'method_path',
@@ -66,6 +65,27 @@ describe('wiki template model', () => {
       'misunderstandings',
       'conflict',
     ])
+  })
+
+  it('provides per-template default section combinations', () => {
+    expect(WIKI_TEMPLATE_DEFAULT_SECTIONS.tech_topic).toEqual([
+      'intro', 'core_principles', 'method_path', 'use_cases', 'sources',
+    ])
+    expect(WIKI_TEMPLATE_DEFAULT_SECTIONS.product_howto).toEqual([
+      'intro', 'basic_steps', 'advanced_usage', 'faq', 'sources',
+    ])
+    expect(WIKI_TEMPLATE_DEFAULT_SECTIONS.social_topic).toEqual([
+      'intro', 'viewpoints', 'controversies', 'impacts', 'sources',
+    ])
+    expect(WIKI_TEMPLATE_DEFAULT_SECTIONS.media_list).toEqual([
+      'intro', 'representative_works', 'comparison', 'reading_order', 'sources',
+    ])
+
+    for (const templateType of WIKI_TEMPLATE_TYPES) {
+      const defaults = WIKI_TEMPLATE_DEFAULT_SECTIONS[templateType]
+      expect(defaults[0]).toBe('intro')
+      expect(defaults[defaults.length - 1]).toBe('sources')
+    }
   })
 
   it('uses the task 1 diagnosis, page plan, and section draft shapes', () => {

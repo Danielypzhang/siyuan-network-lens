@@ -1,34 +1,28 @@
 import {
-  WIKI_SHARED_SECTION_TYPES,
+  WIKI_SECTION_TYPES,
+  WIKI_TEMPLATE_DEFAULT_SECTIONS,
   type WikiSectionType,
-  type WikiTemplateConfidence,
   type WikiTemplateType,
 } from './wiki-template-model'
 
-const LOW_CONFIDENCE_SUPPRESSED_MODULES = new Set<WikiSectionType>([
-  'faq',
-  'controversies',
-  'open_questions',
-])
-
 export function resolveSectionOrder(params: {
-  templateType: WikiTemplateType
-  enabledModules: WikiSectionType[]
-  confidence: WikiTemplateConfidence
+  templateType?: WikiTemplateType
+  enabledModules?: WikiSectionType[]
+  confidence?: string
+  aiSectionOrder?: WikiSectionType[]
 }): WikiSectionType[] {
-  // Task 2 only standardizes shared-section ordering and low-confidence suppression.
-  // templateType will start shaping per-template ordering in the later diagnosis/planning stage.
-  void params.templateType
+  const { aiSectionOrder, templateType } = params
 
-  const middleModules = params.enabledModules.filter((module) => {
-    if (WIKI_SHARED_SECTION_TYPES.includes(module as typeof WIKI_SHARED_SECTION_TYPES[number])) {
-      return false
-    }
-    if (params.confidence === 'low' && LOW_CONFIDENCE_SUPPRESSED_MODULES.has(module)) {
-      return false
-    }
-    return true
-  })
+  if (
+    aiSectionOrder
+    && aiSectionOrder.length > 0
+    && aiSectionOrder.every(item => WIKI_SECTION_TYPES.includes(item))
+  ) {
+    const withoutSources = aiSectionOrder.filter(s => s !== 'sources')
+    const hasSources = aiSectionOrder.includes('sources')
+    return hasSources ? [...withoutSources, 'sources'] : withoutSources
+  }
 
-  return ['intro', 'highlights', ...middleModules, 'sources']
+  const resolvedType = templateType ?? 'tech_topic'
+  return [...WIKI_TEMPLATE_DEFAULT_SECTIONS[resolvedType]]
 }

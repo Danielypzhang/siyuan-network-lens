@@ -6,6 +6,8 @@ import {
   buildRouteUserPrompt,
   buildChatSystemPrompt,
   buildWikiContextMessage,
+  buildActiveDocChatSystemPrompt,
+  buildActiveDocChatUserPrompt,
   parseRouteResponse,
   parseChatResponse,
 } from '@/analytics/llm-wiki-chat-service'
@@ -61,6 +63,11 @@ export interface WikiChatSessionController {
   switchSource: (page: WikiIndexPage) => void
   resetSession: () => void
   buildSaveMarkdown: () => string
+  appendChatToWiki: (params: {
+    wikiStore: { getPageRecord: (pageKey: string) => Promise<{ pageId?: string, sourceDocumentIds?: string[] } | null> }
+    getBlockKramdown: (id: string) => Promise<{ id: string, kramdown: string }>
+    updateBlock: (dataType: 'markdown' | 'dom', data: string, id: string) => Promise<any>
+  }) => Promise<boolean>
 }
 
 let messageIdCounter = 0
@@ -158,7 +165,66 @@ export function createWikiChatSession(options: WikiChatSessionOptions): WikiChat
     })
 
     try {
-      // 3. Route if needed (first message in topic mode)
+      if (scope.value.mode === 'active' && scope.value.activeContent) {
+        const activeCtx = scope.value.activeContent
+
+        const maxContext = config.value.aiMaxContextMessages ?? 1
+        const recentHistory = session.value.messages
+          .filter(m => m.role === 'user' || m.role === 'assistant')
+          .slice(-(maxContext * 2))
+
+        const contextMessages = [
+          { role: 'system' as const, content: buildActiveDocChatSystemPrompt() },
+          ...recentHistory.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+          { role: 'user' as const, content: buildActiveDocChatUserPrompt({
+            documentTitle: activeCtx.title,
+            documentContent: activeCtx.content,
+            question: cleanText,
+          }) },
+        ]
+
+        session.value.isLoading = true
+        const endpoint = `${config.value.aiBaseUrl.replace(/\/+$/, '')}/chat/completions`
+        logger?.log('[WikiChat] active doc chat: calling AI', {
+          endpoint,
+          model: config.value.aiModel,
+          messageCount: contextMessages.length,
+          documentId: activeCtx.documentId,
+        })
+        const response = await forwardProxy(
+          endpoint,
+          'POST',
+          JSON.stringify({
+            model: config.value.aiModel,
+            messages: contextMessages,
+            max_tokens: config.value.aiMaxTokens,
+            temperature: config.value.aiTemperature,
+          }),
+          [
+            { Authorization: `Bearer ${config.value.aiApiKey}` },
+            { Accept: 'application/json' },
+          ],
+          config.value.aiRequestTimeoutSeconds * 1000,
+          'application/json',
+        )
+        const body = typeof response.body === 'string' ? JSON.parse(response.body) : response.body
+        const aiContent = body.choices?.[0]?.message?.content ?? ''
+        logger?.log('[WikiChat] active doc chat: AI content', { content: aiContent.slice(0, 200) })
+
+        const parsed = parseChatResponse(aiContent)
+        logger?.log('[WikiChat] active doc chat: parsed answer', {
+          answer: parsed.answer.slice(0, 100),
+          refCount: parsed.referencedDocumentIds.length,
+        })
+        session.value.messages.push({
+          id: nextMessageId(),
+          role: 'assistant',
+          content: parsed.answer,
+          timestamp: Date.now(),
+          referencedDocumentIds: parsed.referencedDocumentIds,
+        })
+      } else {
+        // 3. Route if needed (first message in topic mode)
       if (!session.value.currentSourcePage) {
         const routingMsgId = nextMessageId()
         session.value.messages.push({
@@ -281,6 +347,7 @@ export function createWikiChatSession(options: WikiChatSessionOptions): WikiChat
         sourcePage: session.value.currentSourcePage,
         referencedDocumentIds: parsed.referencedDocumentIds,
       })
+      }
     } catch (e: any) {
       logger?.error('[WikiChat] sendMessage error:', e.message ?? String(e))
       session.value.error = e.message ?? String(e)
@@ -329,9 +396,12 @@ export function createWikiChatSession(options: WikiChatSessionOptions): WikiChat
   }
 
   function resetSession() {
+    const initialSourcePage = scope.value.mode === 'document'
+      ? scope.value.targetPage ?? null
+      : null
     session.value = {
       messages: [],
-      currentSourcePage: scope.value.mode === 'document' ? scope.value.targetPage ?? null : null,
+      currentSourcePage: initialSourcePage,
       isRouting: false,
       isLoading: false,
       error: null,
@@ -377,6 +447,76 @@ export function createWikiChatSession(options: WikiChatSessionOptions): WikiChat
     return lines.join('\n')
   }
 
+  async function appendChatToWiki(params: {
+    wikiStore: { getPageRecord: (pageKey: string) => Promise<{ pageId?: string, sourceDocumentIds?: string[] } | null> }
+    getBlockKramdown: (id: string) => Promise<{ id: string, kramdown: string }>
+    updateBlock: (dataType: 'markdown' | 'dom', data: string, id: string) => Promise<any>
+  }): Promise<boolean> {
+    const msgs = session.value.messages
+    const userMsgs = msgs.filter(m => m.role === 'user')
+    const assistantMsgs = msgs.filter(m => m.role === 'assistant')
+    if (userMsgs.length === 0 || assistantMsgs.length === 0) return false
+
+    const documentId = scope.value.mode === 'active' && scope.value.activeContent
+      ? scope.value.activeContent.documentId
+      : session.value.currentSourcePage?.documentId
+    if (!documentId) return false
+
+    const pageKey = `theme:${documentId}`
+    const record = await params.wikiStore.getPageRecord(pageKey)
+    const wikiPageId = record?.pageId
+    if (!wikiPageId) return false
+
+    const wikiBlock = await params.getBlockKramdown(wikiPageId)
+    const kramdown = wikiBlock.kramdown ?? ''
+
+    const manualHeading = t('wikiMaintain.manualNotes')
+    const manualHeadingPattern = new RegExp(`^##\\s+${escapeRegExp(manualHeading)}\\s*$`, 'm')
+    const manualMatch = kramdown.match(manualHeadingPattern)
+
+    const chatMarkdown = buildChatAppendMarkdown()
+
+    let updatedKramdown: string
+    if (manualMatch && typeof manualMatch.index === 'number') {
+      const insertIndex = manualMatch.index + manualMatch[0].length
+      updatedKramdown = kramdown.slice(0, insertIndex)
+        + '\n\n' + chatMarkdown
+        + kramdown.slice(insertIndex)
+    } else {
+      updatedKramdown = kramdown + '\n\n## ' + manualHeading + '\n\n' + chatMarkdown
+    }
+
+    await params.updateBlock('markdown', updatedKramdown, wikiPageId)
+    logger?.log('[WikiChat] appendChatToWiki: appended chat to wiki page', { wikiPageId, documentId })
+    return true
+  }
+
+  function buildChatAppendMarkdown(): string {
+    const msgs = session.value.messages
+    const now = new Date().toLocaleString()
+    const lines: string[] = [
+      `### ${t('llmWiki.chat.chatTitle')} - ${now}`,
+      '',
+    ]
+
+    let qIndex = 0
+    for (const msg of msgs) {
+      if (msg.role === 'user') {
+        qIndex++
+        lines.push(`**Q${qIndex}:** ${msg.content}`)
+      } else if (msg.role === 'assistant') {
+        lines.push(`**A${qIndex}:** ${msg.content}`)
+        lines.push('')
+      }
+    }
+
+    return lines.join('\n')
+  }
+
+  function escapeRegExp(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  }
+
   return {
     session,
     inputText,
@@ -388,5 +528,6 @@ export function createWikiChatSession(options: WikiChatSessionOptions): WikiChat
     switchSource,
     resetSession,
     buildSaveMarkdown,
+    appendChatToWiki,
   }
 }

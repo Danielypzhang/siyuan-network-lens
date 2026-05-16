@@ -219,6 +219,40 @@
             :placeholder="t('settings.wiki.maintenancePromptDescription')"
           />
         </div>
+        <div v-if="showWikiSettings" class="setting-field setting-field--full">
+          <span>
+            {{ t('settings.wiki.templatePrompts') }}
+            <span class="setting-field__hint">{{ t('settings.wiki.templatePromptsDescription') }}</span>
+          </span>
+          <div class="setting-tabs">
+            <button
+              v-for="templateType in WIKI_TEMPLATE_TYPES"
+              :key="templateType"
+              :class="['setting-tabs__tab', { 'setting-tabs__tab--active': activeTemplateTab === templateType }]"
+              type="button"
+              @click="activeTemplateTab = templateType"
+            >
+              {{ t(TEMPLATE_TAB_I18N_KEYS[templateType]) }}
+            </button>
+          </div>
+          <template v-for="templateType in WIKI_TEMPLATE_TYPES" :key="templateType">
+            <div v-if="activeTemplateTab === templateType" class="setting-template-prompt">
+              <textarea
+                v-model="config.wikiTemplatePrompts[templateType]"
+                rows="8"
+                class="setting-textarea"
+                :placeholder="templatePlaceholder(templateType)"
+              />
+              <button
+                class="setting-button setting-button--ghost setting-button--compact"
+                type="button"
+                @click="resetTemplatePrompt(templateType)"
+              >
+                {{ t('settings.wiki.resetToDefault') }}
+              </button>
+            </div>
+          </template>
+        </div>
         <div v-if="showAiServiceSettings" class="setting-field setting-field--full">
           <span>{{ t('settings.ai.provider') }}</span>
           <div class="setting-field__inline">
@@ -488,7 +522,8 @@ import { useSettingPanelAi } from '@/components/use-setting-panel-ai'
 import { t } from '@/i18n/ui'
 import ThemeMultiSelect from '@/components/ThemeMultiSelect.vue'
 import { isAlphaSettingVisible, isAlphaSummaryCardVisible } from '@/plugin/alpha-feature-config'
-import { ensureConfigDefaults, type PluginConfig, DEFAULT_WIKI_MAINTENANCE_PROMPT, CURRENT_WIKI_PROMPT_VERSION } from '@/types/config'
+import { ensureConfigDefaults, type PluginConfig, DEFAULT_WIKI_MAINTENANCE_PROMPT, DEFAULT_WIKI_TEMPLATE_PROMPTS, CURRENT_WIKI_PROMPT_VERSION } from '@/types/config'
+import { WIKI_TEMPLATE_TYPES, type WikiTemplateType } from '@/analytics/wiki-template-model'
 
 const props = defineProps<{
   config: PluginConfig
@@ -539,6 +574,31 @@ function toggleSection(sectionKey: SettingSectionKey) {
 function restoreDefaultWikiPrompt() {
   props.config.wikiMaintenancePrompt = DEFAULT_WIKI_MAINTENANCE_PROMPT
   props.config.wikiMaintenancePromptVersion = CURRENT_WIKI_PROMPT_VERSION
+}
+
+if (!props.config.wikiTemplatePrompts || typeof props.config.wikiTemplatePrompts !== 'object') {
+  props.config.wikiTemplatePrompts = {}
+}
+
+const activeTemplateTab = ref<WikiTemplateType>('tech_topic')
+
+const TEMPLATE_TAB_I18N_KEYS: Record<WikiTemplateType, string> = {
+  tech_topic: 'settings.wiki.templateTypeTechTopic',
+  product_howto: 'settings.wiki.templateTypeProductHowto',
+  social_topic: 'settings.wiki.templateTypeSocialTopic',
+  media_list: 'settings.wiki.templateTypeMediaList',
+}
+
+function templatePlaceholder(templateType: WikiTemplateType): string {
+  const full = DEFAULT_WIKI_TEMPLATE_PROMPTS[templateType] ?? ''
+  return full.slice(0, 100) + (full.length > 100 ? '...' : '')
+}
+
+function resetTemplatePrompt(templateType: WikiTemplateType) {
+  if (props.config.wikiTemplatePrompts) {
+    delete props.config.wikiTemplatePrompts[templateType]
+    props.config.wikiTemplatePrompts = { ...props.config.wikiTemplatePrompts }
+  }
 }
 
 const {
@@ -902,6 +962,55 @@ onMounted(async () => {
 
 .setting-select-shell {
   padding: 10px 12px;
+}
+
+.setting-textarea {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--b3-theme-primary) 12%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--b3-theme-surface) 60%, transparent);
+  color: var(--b3-theme-on-background);
+  padding: 10px 12px;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.setting-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.setting-tabs__tab {
+  border: 1px solid color-mix(in srgb, var(--b3-theme-primary) 12%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: color-mix(in srgb, var(--b3-theme-on-background) 65%, transparent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 12px;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.setting-tabs__tab:hover {
+  background: color-mix(in srgb, var(--b3-theme-primary) 8%, transparent);
+  color: var(--b3-theme-on-background);
+}
+
+.setting-tabs__tab--active {
+  background: color-mix(in srgb, var(--b3-theme-primary) 12%, transparent);
+  color: var(--b3-theme-primary);
+  border-color: color-mix(in srgb, var(--b3-theme-primary) 25%, transparent);
+  font-weight: 500;
+}
+
+.setting-template-prompt {
+  display: grid;
+  gap: 8px;
 }
 
 @media (max-width: 720px) {

@@ -1,0 +1,18 @@
+- [x] 模板类型提示词：4 种模板类型各有内置默认提示词（含章节边界约束），存储在 config.ts
+- [x] 主题级提示词存储：WikiPageSnapshotRecord 包含 themePrompt 字段，savePageRecord/getPageRecord 正确读写
+- [x] 三层回退逻辑：buildWikiSystemPrompt 按 主题提示词 > 模板类型提示词 > 全局提示词 回退
+- [x] AI 调用链传递：diagnoseThemeTemplate/planThemePage/generateThemeSection 正确传递提示词参数
+- [x] DEFAULT_WIKI_MAINTENANCE_PROMPT 精简：移除与章节职责重叠的具体内容要求，只保留通用原则
+- [x] WIKI_SHARED_SECTION_TYPES 取消：所有章节类型平等可选，由 AI 动态决定
+- [x] 模板类型推荐章节组合：每种模板类型有 fallback 的默认章节组合
+- [x] resolveSectionOrder 动态化：以 AI 的 sectionOrder 为准，sources 始终在末尾
+- [x] planThemePage 引导动态章节：prompt 引导 AI 根据内容选择章节组合
+- [x] 向后兼容：渲染器仍能正确识别旧的 intro/highlights/sources 章节标记
+- [x] SettingPanel 模板提示词配置：4 个模板类型 tab + textarea + 重置按钮
+- [x] RankingPanel 主题提示词配置：编辑提示词按钮 + 编辑对话框
+- [x] 活动文档获取：resolveProtyleZoomBlockId 能从 protyle 提取聚焦块 ID
+- [x] 文档问答模式：WikiChatScope 支持 active 模式，sendMessage 使用 activeContent 作为上下文
+- [x] 文档问答提示词：buildActiveDocChatSystemPrompt 基于文档内容回答问题
+- [x] 追加到 Wiki：问答结果可追加到对应主题 Wiki 页面的人工备注区
+- [x] 文档问答 UI：有"AI 问答"按钮入口，WikiChatDialog 适配 active 模式显示
+- [x] i18n：所有新增 UI 文本有中英文翻译

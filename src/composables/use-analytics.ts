@@ -11,6 +11,7 @@ import {
   type TimeRange,
 } from '@/analytics/analysis'
 import { createActiveDocumentSync } from '@/analytics/active-document'
+import { sql } from '@/api'
 import {
   buildLargeDocumentSummary,
   loadLargeDocumentMetrics,
@@ -226,6 +227,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
   const toDocumentId = ref('')
   const selectedEvidenceDocument = ref('')
   const activeDocumentId = ref('')
+  const activeZoomBlockId = ref('')
   const selectedCommunityId = ref('')
   const pathScope = ref<PathScope>('focused')
   const maxPathDepth = ref(6)
@@ -702,6 +704,9 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
         onDocumentId: (documentId) => {
           activeDocumentId.value = documentId
         },
+        onZoomBlockId: (result) => {
+          activeZoomBlockId.value = result?.isZoomedIn ? result.blockId : ''
+        },
       })
       refresh()
     })
@@ -862,6 +867,25 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
     })
   }
 
+  async function getActiveDocumentContent(): Promise<{ documentId: string, title: string, content: string, isZoomedIn: boolean }> {
+    const zoomBlockId = activeZoomBlockId.value
+    const docId = activeDocumentId.value
+    const isZoomedIn = zoomBlockId !== ''
+    const targetId = isZoomedIn ? zoomBlockId : docId
+
+    if (!targetId) {
+      return { documentId: docId, title: '', content: '', isZoomedIn: false }
+    }
+
+    const kramdownResult = await getBlockKramdown(targetId)
+    const content = kramdownResult?.kramdown ?? ''
+
+    const rows = await sql(`SELECT content FROM blocks WHERE id = '${targetId}'`)
+    const title = Array.isArray(rows) && rows.length > 0 ? (rows[0].content ?? '') : ''
+
+    return { documentId: docId, title, content, isZoomedIn }
+  }
+
   function formatTimestamp(timestamp?: string) {
     if (!timestamp || timestamp.length < 8) {
       return t('analytics.controller.unknownTime')
@@ -988,6 +1012,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
     toDocumentId,
     selectedEvidenceDocument,
     activeDocumentId,
+    activeZoomBlockId,
     selectedCommunityId,
     pathScope,
     maxPathDepth,
@@ -1057,6 +1082,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
     resolveTitle,
     resolveNotebookName,
     openDocument,
+    getActiveDocumentContent,
     openWikiDocument,
     generateDocIndex,
     hasDocIndex,
@@ -1092,6 +1118,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
     closeLlmWikiChat: llmWikiChat.closeChat,
     openLlmWikiMaintainDiff: llmWikiChat.openMaintainDiff,
     closeLlmWikiMaintainDiff: llmWikiChat.closeMaintainDiff,
+    aiWikiStore,
   }
 }
 

@@ -238,11 +238,15 @@
         :open-doc-index="openDocIndex"
         :batch-generate-doc-index="batchGenerateDocIndex"
         :batch-delete-doc-index="batchDeleteDocIndex"
+        :on-save-theme-prompt="handleSaveThemePrompt"
+        :on-get-theme-prompt="handleGetThemePrompt"
+        :wiki-template-prompts="props.config.wikiTemplatePrompts"
         @update:incremental-enabled="handleIncrementalEnabledChange"
         @toggle-theme-link="handleToggleThemeLink"
         @add-tag="handleAddTag"
         @open-wiki-chat="openLlmWikiChat"
         @maintain-wiki-page="handleLlmWikiMaintain"
+        @open-active-chat="handleOpenActiveChat"
       />
     </template>
 
@@ -252,6 +256,8 @@
       :wiki-pages="llmWikiPages"
       :forward-proxy="forwardProxy"
       :get-block-kramdown="getBlockKramdown"
+      :wiki-store="aiWikiStore ?? undefined"
+      :update-block="updateBlock"
       :config="{
         aiBaseUrl: props.config.aiBaseUrl ?? '',
         aiApiKey: props.config.aiApiKey ?? '',
@@ -264,6 +270,7 @@
       }"
       @close="closeLlmWikiChat"
       @save="handleLlmWikiChatSave"
+      @append-to-wiki-result="handleAppendToWikiResult"
     />
 
     <WikiMaintainDiffDialog
@@ -437,6 +444,7 @@ const {
   isAiLinkSuggestionActive,
   toggleOrphanAiTagSuggestion,
   isAiTagSuggestionActive,
+  aiWikiStore,
 } = analytics
 
 const {
@@ -499,6 +507,23 @@ function handleAddTag(documentId: string, tag?: string) {
   toggleOrphanAiTagSuggestion(documentId, resolvedTag)
 }
 
+async function handleSaveThemePrompt(documentId: string, prompt: string | undefined) {
+  if (!aiWikiStore) return
+  const pageKey = `theme:${documentId}`
+  const record = await aiWikiStore.getPageRecord(pageKey)
+  if (record) {
+    record.themePrompt = prompt
+    await aiWikiStore.savePageRecord(record)
+  }
+}
+
+async function handleGetThemePrompt(documentId: string): Promise<string | undefined> {
+  if (!aiWikiStore) return undefined
+  const pageKey = `theme:${documentId}`
+  const record = await aiWikiStore.getPageRecord(pageKey)
+  return record?.themePrompt
+}
+
 async function handleLlmWikiMaintain(page: WikiIndexPage) {
   console.info('[llm-wiki-maintain] button clicked', page.documentId, page.title)
   openLlmWikiMaintainDiff(page)
@@ -538,6 +563,26 @@ function handleLlmWikiMaintainApply(_selectedSuggestions: any[]) {
       llmWikiMaintainTargetPage.value.maintenanceState.diffPreview,
     )
     closeLlmWikiMaintainDiff()
+  }
+}
+
+async function handleOpenActiveChat() {
+  const activeContent = await getActiveDocumentContent()
+  if (!activeContent.documentId && !activeContent.content) {
+    showMessage(t('analytics.controller.analysisNotReady'), 3000, 'error')
+    return
+  }
+  openLlmWikiChat({
+    mode: 'active',
+    activeContent,
+  })
+}
+
+function handleAppendToWikiResult(success: boolean) {
+  if (success) {
+    showMessage(t('wikiChat.appendToWikiSuccess'), 3000, 'info')
+  } else {
+    showMessage(t('wikiChat.appendToWikiFailed'), 5000, 'error')
   }
 }
 

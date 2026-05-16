@@ -213,6 +213,7 @@ export function createAnalyticsWikiActionsController(params: {
         themeDocumentId: themeDocument.documentId,
       })
       const storedRecord = await params.aiWikiStore.getPageRecord(pageKey)
+      const themePrompt = storedRecord?.themePrompt
       const isIncremental = params.config.wikiIncrementalEnabled !== false
       const hasStoredTimestamps = storedRecord?.sourceDocumentTimestamps
         && Object.keys(storedRecord.sourceDocumentTimestamps).length > 0
@@ -444,6 +445,7 @@ export function createAnalyticsWikiActionsController(params: {
               payload: batchPayload,
               existingWikiContent: currentWikiContent,
               isIncremental: isIncrementalUpdate || cycleIndex > 0 || batchIndex > 0,
+              themePrompt,
             })
             batchPagePlan = await params.aiWikiService.planThemePage({
               config: params.appliedConfig.value,
@@ -451,6 +453,8 @@ export function createAnalyticsWikiActionsController(params: {
               diagnosis: batchDiagnosis,
               existingWikiContent: currentWikiContent,
               isIncremental: isIncrementalUpdate || cycleIndex > 0 || batchIndex > 0,
+              themePrompt,
+              templateType: batchDiagnosis.templateType,
             })
             batchSections = await Promise.all(batchPagePlan.sectionOrder.map(sectionType => params.aiWikiService!.generateThemeSection({
               config: params.appliedConfig.value,
@@ -460,6 +464,8 @@ export function createAnalyticsWikiActionsController(params: {
               sectionType,
               existingWikiContent: currentWikiContent,
               isIncremental: isIncrementalUpdate || cycleIndex > 0 || batchIndex > 0,
+              themePrompt,
+              templateType: batchDiagnosis.templateType,
             })))
 
             const batchTitleMap = Object.fromEntries(batchPayload.sourceDocuments.map(doc => [doc.documentId, doc.title]))
@@ -499,6 +505,7 @@ export function createAnalyticsWikiActionsController(params: {
             payload: cyclePayload,
             existingWikiContent: currentWikiContent,
             isIncremental: isIncrementalUpdate || cycleIndex > 0,
+            themePrompt,
           })
           finalPagePlan = await params.aiWikiService.planThemePage({
             config: params.appliedConfig.value,
@@ -506,6 +513,8 @@ export function createAnalyticsWikiActionsController(params: {
             diagnosis: finalDiagnosis,
             existingWikiContent: currentWikiContent,
             isIncremental: isIncrementalUpdate || cycleIndex > 0,
+            themePrompt,
+            templateType: finalDiagnosis.templateType,
           })
           finalSections = await Promise.all(finalPagePlan.sectionOrder.map(sectionType => params.aiWikiService!.generateThemeSection({
             config: params.appliedConfig.value,
@@ -515,6 +524,8 @@ export function createAnalyticsWikiActionsController(params: {
             sectionType,
             existingWikiContent: currentWikiContent,
             isIncremental: isIncrementalUpdate || cycleIndex > 0,
+            themePrompt,
+            templateType: finalDiagnosis.templateType,
           })))
 
           const cycleTitleMap = Object.fromEntries(cyclePayload.sourceDocuments.map(doc => [doc.documentId, doc.title]))

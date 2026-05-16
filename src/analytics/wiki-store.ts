@@ -15,6 +15,7 @@ export interface WikiPageSnapshotRecord {
   pageId?: string
   themeDocumentId?: string
   themeDocumentTitle?: string
+  themePrompt?: string
   sourceDocumentIds: string[]
   sourceDocumentEntries?: WikiSourceDocumentEntry[]
   sourceDocumentTimestamps?: Record<string, string>
@@ -157,6 +158,7 @@ function normalizePageRecord(value: unknown): WikiPageSnapshotRecord {
     pageId: normalizeOptionalString(record.pageId) || undefined,
     themeDocumentId: normalizeOptionalString(record.themeDocumentId) || undefined,
     themeDocumentTitle: normalizeOptionalString(record.themeDocumentTitle) || undefined,
+    themePrompt: normalizeOptionalString(record.themePrompt) || undefined,
     sourceDocumentIds: normalizeStringList(record.sourceDocumentIds),
     sourceDocumentEntries: normalizeWikiSourceDocumentEntries(record.sourceDocumentEntries),
     sourceDocumentTimestamps: normalizeTimestampMap(record.sourceDocumentTimestamps),

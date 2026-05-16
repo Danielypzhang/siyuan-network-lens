@@ -6,7 +6,7 @@ export const WIKI_TEMPLATE_TYPES = [
 ] as const
 export type WikiTemplateType = typeof WIKI_TEMPLATE_TYPES[number]
 
-export const WIKI_SHARED_SECTION_TYPES = ['intro', 'highlights', 'sources'] as const
+const WIKI_SHARED_SECTION_TYPES = ['intro', 'highlights', 'sources'] as const
 export type WikiSharedSectionType = typeof WIKI_SHARED_SECTION_TYPES[number]
 
 export const WIKI_OPTIONAL_SECTION_TYPES = [
@@ -33,6 +33,13 @@ export type WikiOptionalSectionType = typeof WIKI_OPTIONAL_SECTION_TYPES[number]
 
 export const WIKI_SECTION_TYPES = [...WIKI_SHARED_SECTION_TYPES, ...WIKI_OPTIONAL_SECTION_TYPES] as const
 export type WikiSectionType = typeof WIKI_SECTION_TYPES[number]
+
+export const WIKI_TEMPLATE_DEFAULT_SECTIONS: Record<WikiTemplateType, WikiSectionType[]> = {
+  tech_topic: ['intro', 'core_principles', 'method_path', 'use_cases', 'sources'],
+  product_howto: ['intro', 'basic_steps', 'advanced_usage', 'faq', 'sources'],
+  social_topic: ['intro', 'viewpoints', 'controversies', 'impacts', 'sources'],
+  media_list: ['intro', 'representative_works', 'comparison', 'reading_order', 'sources'],
+}
 
 export type WikiSectionFormat = 'overview' | 'structured' | 'qa' | 'debate' | 'catalog'
 

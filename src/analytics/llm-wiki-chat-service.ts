@@ -142,3 +142,28 @@ export function buildWikiContextMessage(params: {
   }
   return parts.join('\n')
 }
+
+export function buildActiveDocChatSystemPrompt(): string {
+  return [
+    'You are a knowledge assistant for SiYuan notes.',
+    'Answer the user question based on the provided document content.',
+    'If the document content is insufficient to answer the question, clearly state that.',
+    'Return JSON with two fields: "answer" (string) and "referencedDocumentIds" (string array, empty if no source documents were referenced).',
+    'Do not invent information not present in the provided context.',
+  ].join(' ')
+}
+
+export function buildActiveDocChatUserPrompt(params: {
+  documentTitle: string
+  documentContent: string
+  question: string
+}): string {
+  return [
+    `Document: ${params.documentTitle}`,
+    '',
+    'Document content:',
+    params.documentContent,
+    '',
+    `User question: ${params.question}`,
+  ].join('\n')
+}

@@ -4,6 +4,13 @@
       <div class="panel-header__main">
         <h2 class="panel-header__title">{{ t('rankingPanel.title') }}</h2>
         <div class="panel-header__actions">
+        <button
+          class="ghost-button ghost-button--filled"
+          type="button"
+          @click="emit('openActiveChat')"
+        >
+          {{ t('wikiChat.activeDocChat') }}
+        </button>
         <span class="meta-text">{{ t('rankingPanel.docsCount', { count: panelCount }) }}</span>
         <span class="meta-text">{{ t('rankingPanel.lastRefreshed', { value: snapshotLabel }) }}</span>
         <button
@@ -219,13 +226,26 @@
               v-if="showWikiPanelActions && item.isThemeDocument"
               class="ranking-item__wiki"
             >
-              <button
-                class="action-button"
-                type="button"
-                @click="toggleCoreDocumentWikiPanel(item.documentId)"
-              >
-                {{ isWikiPanelVisibleForCoreDocument(item.documentId) ? t('rankingPanel.hideWiki') : t('rankingPanel.maintainWiki') }}
-              </button>
+              <div class="ranking-item__wiki-actions">
+                <button
+                  class="action-button"
+                  type="button"
+                  @click="toggleCoreDocumentWikiPanel(item.documentId)"
+                >
+                  {{ isWikiPanelVisibleForCoreDocument(item.documentId) ? t('rankingPanel.hideWiki') : t('rankingPanel.maintainWiki') }}
+                </button>
+                <button
+                  v-if="$props.onSaveThemePrompt"
+                  class="ghost-button ghost-button--filled ranking-item__edit-prompt-btn"
+                  type="button"
+                  :title="t('rankingPanel.themeEditPrompt')"
+                  @click="openThemePromptDialog(item.documentId)"
+                >
+                  <svg class="ranking-item__edit-prompt-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 20h1.5L17.5 8 16 6.5 4 19V20zm-2 2v-4L17.5 2.5l4 4L6 20H2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+              </div>
               <WikiMaintainPanel
                 v-if="isWikiPanelVisibleForCoreDocument(item.documentId)"
                 v-bind="wikiPanelProps"
@@ -246,6 +266,33 @@
         {{ t('rankingPanel.empty') }}
       </div>
     </div>
+
+    <div v-if="themePromptDialogVisible" class="theme-prompt-overlay" @click.self="closeThemePromptDialog">
+      <div class="theme-prompt-dialog">
+        <h3 class="theme-prompt-dialog__title">{{ t('rankingPanel.themePromptDialogTitle') }}</h3>
+        <p class="theme-prompt-dialog__subtitle">{{ themePromptDialogDocumentTitle }}</p>
+        <textarea
+          v-model="themePromptEditText"
+          class="theme-prompt-dialog__textarea"
+          rows="8"
+        />
+        <div class="theme-prompt-dialog__reference">
+          <strong>{{ t('rankingPanel.themePromptDialogReference') }}</strong>
+          <pre class="theme-prompt-dialog__reference-text">{{ themePromptReferenceText }}</pre>
+        </div>
+        <div class="theme-prompt-dialog__actions">
+          <button class="action-button" type="button" @click="saveThemePrompt">
+            {{ t('rankingPanel.themePromptDialogSave') }}
+          </button>
+          <button class="ghost-button" type="button" @click="clearThemePrompt">
+            {{ t('rankingPanel.themePromptDialogClear') }}
+          </button>
+          <button class="ghost-button" type="button" @click="closeThemePromptDialog">
+            {{ t('wikiMaintain.maintain.cancel') }}
+          </button>
+        </div>
+      </div>
+    </div>
   </component>
 </template>
 
@@ -257,6 +304,7 @@ import type { LinkDirection } from '@/analytics/link-sync'
 import type { WikiPreviewState } from '@/composables/use-analytics'
 import { ref } from 'vue'
 import { t } from '@/i18n/ui'
+import { DEFAULT_WIKI_TEMPLATE_PROMPTS } from '@/types/config'
 import DocumentTitle from './DocumentTitle.vue'
 import SuggestionCallout from './SuggestionCallout.vue'
 import WikiMaintainPanel from './WikiMaintainPanel.vue'
@@ -305,6 +353,9 @@ const props = withDefaults(defineProps<{
   collapsedItems?: Record<string, boolean>
   onToggleItemCollapse?: (documentId: string) => void
   getBlockKramdown?: (id: string) => Promise<{ id: string; kramdown: string }>
+  onSaveThemePrompt?: (documentId: string, prompt: string | undefined) => Promise<void>
+  onGetThemePrompt?: (documentId: string) => Promise<string | undefined>
+  wikiTemplatePrompts?: Record<string, string>
 }>(), {
   showWikiPanelActions: true,
   variant: 'panel',
@@ -316,9 +367,68 @@ const emit = defineEmits<{
   (e: 'update:incrementalEnabled', value: boolean): void
   (e: 'toggleThemeLink', documentId: string, themeDocumentId: string): void
   (e: 'addTag', documentId: string, tag?: string): void
+  (e: 'openActiveChat'): void
 }>()
 
 const extraOutboundRefsMap = ref<Record<string, ExtractedDocRef[]>>({})
+
+const themePromptDialogVisible = ref(false)
+const themePromptDialogDocumentId = ref('')
+const themePromptDialogDocumentTitle = ref('')
+const themePromptEditText = ref('')
+const themePromptReferenceText = ref('')
+
+async function openThemePromptDialog(documentId: string) {
+  const item = props.ranking.find(r => r.documentId === documentId)
+  if (!item) return
+  themePromptDialogDocumentId.value = documentId
+  themePromptDialogDocumentTitle.value = props.resolveTitle(documentId)
+  themePromptEditText.value = ''
+  themePromptReferenceText.value = ''
+  themePromptDialogVisible.value = true
+
+  if (props.onGetThemePrompt) {
+    try {
+      const existing = await props.onGetThemePrompt(documentId)
+      if (existing) {
+        themePromptEditText.value = existing
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const userOverride = props.wikiTemplatePrompts
+  const templateTypes = ['tech_topic', 'product_howto', 'social_topic', 'media_list'] as const
+  const lines: string[] = []
+  for (const tt of templateTypes) {
+    const prompt = userOverride?.[tt]?.trim() || DEFAULT_WIKI_TEMPLATE_PROMPTS[tt]?.trim()
+    if (prompt) {
+      lines.push(`[${tt}]`, prompt.slice(0, 200) + (prompt.length > 200 ? '...' : ''), '')
+    }
+  }
+  themePromptReferenceText.value = lines.join('\n')
+}
+
+function closeThemePromptDialog() {
+  themePromptDialogVisible.value = false
+}
+
+async function saveThemePrompt() {
+  if (props.onSaveThemePrompt) {
+    const text = themePromptEditText.value.trim()
+    await props.onSaveThemePrompt(themePromptDialogDocumentId.value, text || undefined)
+  }
+  closeThemePromptDialog()
+}
+
+async function clearThemePrompt() {
+  if (props.onSaveThemePrompt) {
+    await props.onSaveThemePrompt(themePromptDialogDocumentId.value, undefined)
+  }
+  themePromptEditText.value = ''
+  closeThemePromptDialog()
+}
 
 async function handleToggleLinkPanel(documentId: string) {
   props.toggleLinkPanel(documentId)
@@ -552,6 +662,113 @@ function resolveAssociations(documentId: string): LinkAssociations {
   display: grid;
   gap: 12px;
   margin-top: 8px;
+}
+
+.ranking-item__wiki-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ranking-item__edit-prompt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+}
+
+.ranking-item__edit-prompt-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.theme-prompt-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.theme-prompt-dialog {
+  background: var(--b3-theme-background);
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  padding: 24px;
+  width: min(560px, 90vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 16px;
+}
+
+.theme-prompt-dialog__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--b3-theme-primary);
+}
+
+.theme-prompt-dialog__subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--panel-muted);
+}
+
+.theme-prompt-dialog__textarea {
+  width: 100%;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--surface-card);
+  color: var(--b3-theme-on-background);
+  padding: 10px 12px;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.theme-prompt-dialog__reference {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--panel-muted);
+}
+
+.theme-prompt-dialog__reference strong {
+  font-weight: 500;
+  font-size: 13px;
+  color: color-mix(in srgb, var(--b3-theme-on-background) 70%, transparent);
+}
+
+.theme-prompt-dialog__reference-text {
+  margin: 0;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--b3-theme-surface) 60%, transparent);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.theme-prompt-dialog__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .ranking-item__timestamps {

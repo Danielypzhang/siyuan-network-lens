@@ -550,9 +550,13 @@
           :show-wiki-panel-actions="showWikiPanelActions"
           :collapsed-items="collapsedItems"
           :on-toggle-item-collapse="toggleItemCollapse"
+          :on-save-theme-prompt="onSaveThemePrompt"
+          :on-get-theme-prompt="onGetThemePrompt"
+          :wiki-template-prompts="wikiTemplatePrompts"
           @update:incremental-enabled="(v: boolean) => emit('update:incrementalEnabled', v)"
           @toggle-theme-link="(docId: string, themeId: string) => emit('toggleThemeLink', docId, themeId)"
           @add-tag="(id: string) => emit('addTag', id)"
+          @open-active-chat="emit('openActiveChat')"
         />
       </template>
       <template v-else-if="detail.kind === 'trends'">
@@ -883,6 +887,9 @@ const props = withDefaults(defineProps<{
   openDocIndex?: (documentId: string) => Promise<void>
   batchGenerateDocIndex?: (documentIds: string[], onProgress?: (done: number, total: number) => void) => Promise<{ success: number, failed: number }>
   batchDeleteDocIndex?: (documentIds: string[]) => Promise<number>
+  onSaveThemePrompt?: (documentId: string, prompt: string | undefined) => Promise<void>
+  onGetThemePrompt?: (documentId: string) => Promise<string | undefined>
+  wikiTemplatePrompts?: Record<string, string>
 }>(), {
   showWikiPanelActions: true,
   showDocumentIndex: false,
@@ -894,6 +901,7 @@ const emit = defineEmits<{
   (e: 'addTag', documentId: string, tag?: string): void
   (e: 'openWikiChat', scope: WikiChatScope): void
   (e: 'maintainWikiPage', page: WikiIndexPage): void
+  (e: 'openActiveChat'): void
 }>()
 
 const summaryCountLabel = computed(() => props.detail.kind === 'aiInbox'

@@ -186,7 +186,7 @@ describe('ai wiki service', () => {
     expect(pagePlan).toEqual({
       templateType: 'tech_topic',
       confidence: 'high',
-      coreSections: ['intro', 'highlights', 'sources'],
+      coreSections: ['intro', 'sources', 'highlights'],
       optionalSections: ['core_principles'],
       sectionOrder: ['intro', 'highlights', 'core_principles', 'sources'],
       sectionGoals: {
@@ -295,9 +295,9 @@ describe('ai wiki service', () => {
       diagnosis,
     })
 
-    expect(pagePlan.coreSections).toEqual(['intro', 'highlights', 'sources'])
+    expect(pagePlan.coreSections).toEqual(['intro', 'sources'])
     expect(pagePlan.optionalSections).toEqual(['comparison', 'misunderstandings'])
-    expect(pagePlan.sectionOrder).toEqual(['intro', 'highlights', 'comparison', 'misunderstandings', 'sources'])
+    expect(pagePlan.sectionOrder).toEqual(['intro', 'comparison', 'sources'])
     expect(pagePlan.sectionOrder).not.toContain('faq')
     expect(pagePlan.sectionGoals).toEqual({
       intro: expect.stringMatching(/Fallback|回退/),
@@ -368,7 +368,7 @@ describe('ai wiki service', () => {
       diagnosis,
     })
 
-    expect(pagePlan.sectionOrder).toEqual(['comparison', 'sources', 'intro', 'highlights', 'misunderstandings'])
+    expect(pagePlan.sectionOrder).toEqual(['comparison', 'intro', 'highlights', 'sources'])
   })
 
   it('keeps shared base sections even when the model tries to suppress them', async () => {
@@ -431,7 +431,6 @@ describe('ai wiki service', () => {
 
     expect(diagnosis.suppressedModules).toEqual(['comparison'])
     expect(pagePlan.sectionOrder).toContain('intro')
-    expect(pagePlan.sectionOrder).toContain('highlights')
     expect(pagePlan.sectionOrder).toContain('sources')
     expect(pagePlan.sectionOrder).not.toContain('comparison')
   })
@@ -854,11 +853,15 @@ describe('ai wiki service', () => {
     expect(pagePlan).toEqual({
       templateType: 'tech_topic',
       confidence: 'low',
-      coreSections: ['intro', 'highlights', 'sources'],
+      coreSections: ['intro', 'sources'],
       optionalSections: [],
-      sectionOrder: ['intro', 'highlights', 'sources'],
+      sectionOrder: ['intro', 'core_principles', 'method_path', 'use_cases', 'sources'],
       sectionGoals: {
         intro: '回退：因模型未返回完整有效的页面规划，已使用保守回退规划。',
+        core_principles: '回退：因模型未返回完整有效的页面规划，已使用保守回退规划。',
+        method_path: '回退：因模型未返回完整有效的页面规划，已使用保守回退规划。',
+        use_cases: '回退：因模型未返回完整有效的页面规划，已使用保守回退规划。',
+        sources: '回退：因模型未返回完整有效的页面规划，已使用保守回退规划。',
       },
       sectionFormats: {},
     })

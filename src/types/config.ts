@@ -28,6 +28,44 @@ export type WikiSourceCitationMode = typeof WIKI_SOURCE_CITATION_MODES[number]
 
 export const CURRENT_WIKI_PROMPT_VERSION = 1
 
+export const DEFAULT_WIKI_TEMPLATE_PROMPTS: Record<string, string> = {
+  tech_topic: [
+    '你正在维护一个技术主题的 Wiki 页面，聚焦技术原理、架构设计、实现细节。',
+    '',
+    '## 章节边界约束',
+    '- **intro**：只提供技术概述，不列举文档列表。',
+    '- **highlights**：评价每篇文档的独特技术贡献，而非简单摘要。',
+    '- **sources**：聚焦技术文档间的引用关系和互补关系，说明文档如何共同构成完整技术图景。',
+  ].join('\n'),
+
+  product_howto: [
+    '你正在维护一个产品操作指南的 Wiki 页面，聚焦操作步骤、配置方法、最佳实践。',
+    '',
+    '## 章节边界约束',
+    '- **intro**：只概述产品功能，不列举文档列表。',
+    '- **highlights**：评价每篇文档的操作指导价值，说明其解决了什么操作问题。',
+    '- **sources**：聚焦操作文档间的步骤衔接关系，说明文档如何构成完整操作流程。',
+  ].join('\n'),
+
+  social_topic: [
+    '你正在维护一个社会话题的 Wiki 页面，聚焦观点、争议、影响分析。',
+    '',
+    '## 章节边界约束',
+    '- **intro**：只概述话题背景，不列举文档列表。',
+    '- **highlights**：评价每篇文档的独特视角，说明其提供了什么不同立场或分析角度。',
+    '- **sources**：聚焦观点间的支持和矛盾关系，说明不同文档的立场如何相互印证或对立。',
+  ].join('\n'),
+
+  media_list: [
+    '你正在维护一个媒体清单的 Wiki 页面，聚焦作品信息、评价、阅读顺序。',
+    '',
+    '## 章节边界约束',
+    '- **intro**：只概述主题范围，不列举文档列表。',
+    '- **highlights**：评价每篇文档的作品推荐价值，说明其推荐理由和适用人群。',
+    '- **sources**：聚焦作品间的关联和比较，说明文档如何帮助读者理解作品间的联系和差异。',
+  ].join('\n'),
+}
+
 export const DEFAULT_WIKI_MAINTENANCE_PROMPT = [
   '你是一位专业的思源笔记知识库维护专家，擅长从原始文档中提取、组织和关联知识，生成结构化的 Wiki 页面。',
   '',
@@ -40,15 +78,6 @@ export const DEFAULT_WIKI_MAINTENANCE_PROMPT = [
   '   - `[+]` AI 基于常识补充的背景信息（不作为绝对事实）',
   '3. **个人相关性**：优先提取对用户个人有具体启发、行动指导或反思价值的内容，避免通用大道理。',
   '4. **宁缺毋滥**：证据不足时，使用 `[待补充]` 标记空缺，**禁止编造内容**。',
-  '',
-  '## 内容要求',
-  '1. **一句话摘要**：开篇用一段话概括本主题的核心要点。',
-  '2. **关键概念**：列出并解释文中出现的关键人物、公司、技术术语、缩写等。',
-  '3. **关键文档**：列出本主题下最有价值的文档（支持多个），说明每篇的独特贡献或视角。',
-  '4. **核心原则与框架**：提炼可复用的方法论、原则、模型或思维框架。',
-  '5. **关系证据**：分析文档之间的引用关系、互补关系或矛盾点，并标注具体来源。',
-  '6. **待解问题**：列出当前资料尚未回答、需要进一步探索的问题。',
-  '7. **下一步行动**：基于当前知识状态，建议用户可以立即采取的具体行动（可落地、可执行）。',
   '',
   '## 输出格式',
   '- 每条事实性陈述尽量绑定来源引用：`<sup>((文档ID "序号"))</sup>`，其中"文档ID"为源文档块ID，"序号"为连续编号。',
@@ -109,6 +138,7 @@ export interface PluginConfig {
   wikiSourceCitationMode?: WikiSourceCitationMode
   wikiBatchSize?: number
   wikiMaxSourceDocs?: number
+  wikiTemplatePrompts?: Record<string, string>
   summaryCardOrder?: string[]
 }
 
@@ -303,6 +333,9 @@ export function ensureConfigDefaults(config: PluginConfig) {
   }
   if (typeof config.wikiMaxSourceDocs !== 'number' || config.wikiMaxSourceDocs < 0) {
     config.wikiMaxSourceDocs = 10
+  }
+  if (config.wikiTemplatePrompts && typeof config.wikiTemplatePrompts !== 'object') {
+    config.wikiTemplatePrompts = undefined
   }
   ensureAiProviderConfigState(config)
 }
