@@ -39,7 +39,6 @@ export async function fetchOutboundBlockRefDocumentIds(documentId: string): Prom
        AND r.root_id = '${escapedId}'
        AND r.def_block_root_id != '${escapedId}'`
   ) as Array<{ documentId: string }>
-  console.log('[NetworkLens] fetchOutboundBlockRefDocumentIds:', documentId, '→', rows.length, 'results:', rows.map(r => r.documentId))
   return rows.map(row => row.documentId)
 }
 
@@ -78,9 +77,7 @@ export function buildLinkAssociations(params: {
   if (params.extraOutboundDocumentIds) {
     for (const targetId of params.extraOutboundDocumentIds) {
       if (targetId === params.documentId) continue
-      const inMap = params.documentMap.has(targetId)
-      console.log('[NetworkLens] extraOutbound:', targetId, 'inDocumentMap:', inMap)
-      if (inMap) {
+      if (params.documentMap.has(targetId)) {
         outboundTargets.add(targetId)
       }
     }
