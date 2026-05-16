@@ -155,15 +155,18 @@ export function createWikiChatSession(options: WikiChatSessionOptions): WikiChat
     const text = inputText.value.trim()
     if (!text || session.value.isLoading) return
 
-    // 1. Check for @ mention in input
-    const atMatch = text.match(/@([^\s@]+)/)
-    if (atMatch) {
-      const mentionText = atMatch[1]
-      const matchedPage = wikiPages.value.find(
-        p => p.title.toLowerCase().includes(mentionText.toLowerCase()),
-      )
-      if (matchedPage) {
-        switchSource(matchedPage)
+    const isActiveMode = scope.value.mode === 'active' && !!scope.value.activeContent
+
+    if (!isActiveMode) {
+      const atMatch = text.match(/@([^\s@]+)/)
+      if (atMatch) {
+        const mentionText = atMatch[1]
+        const matchedPage = wikiPages.value.find(
+          p => p.title.toLowerCase().includes(mentionText.toLowerCase()),
+        )
+        if (matchedPage) {
+          switchSource(matchedPage)
+        }
       }
     }
 

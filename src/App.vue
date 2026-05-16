@@ -446,6 +446,7 @@ const {
   toggleOrphanAiTagSuggestion,
   isAiTagSuggestionActive,
   aiWikiStore,
+  getActiveDocumentContent,
 } = analytics
 
 const {
