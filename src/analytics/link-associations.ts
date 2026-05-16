@@ -24,7 +24,7 @@ export interface ExtractedDocRef {
   anchorText?: string
 }
 
-export function extractKramdownBlockIds(kramdown: string): { blockId: string; anchorText?: string }[] {
+export function extractKramdownBlockRefs(kramdown: string): { blockId: string; anchorText?: string }[] {
   const map = new Map<string, { blockId: string; anchorText?: string }>()
   for (const match of kramdown.matchAll(SIYUAN_BLOCK_URL_PATTERN)) {
     const id = match[1]
@@ -45,62 +45,26 @@ export function extractKramdownBlockIds(kramdown: string): { blockId: string; an
   return [...map.values()]
 }
 
-async function resolveBlockIdsToDocRefs(blockIds: string[]): Promise<ExtractedDocRef[]> {
-  if (blockIds.length === 0) return []
-  const ids = blockIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',')
-  const rows = await sql(
-    `SELECT b.id AS blockId,
-            b.root_id AS documentId,
-            b.content AS blockContent,
-            d.content AS docTitle
-     FROM blocks b
-     LEFT JOIN blocks d ON d.id = b.root_id AND d.type = 'd'
-     WHERE b.id IN (${ids})`
-  ) as Array<{ blockId: string; documentId: string; blockContent: string | null; docTitle: string | null }>
-
-  const result = new Map<string, ExtractedDocRef>()
-  for (const row of rows) {
-    const existing = result.get(row.documentId)
-    if (!existing) {
-      result.set(row.documentId, {
-        documentId: row.documentId,
-        anchorText: row.docTitle || row.blockContent || undefined,
-      })
-    }
-  }
-  return [...result.values()]
-}
-
 export async function fetchOutboundBlockRefDocRefs(documentId: string): Promise<ExtractedDocRef[]> {
   const escapedId = documentId.replace(/'/g, "''")
   const rows = await sql(
-    `SELECT DISTINCT r.def_block_id AS blockId,
-            r.def_block_root_id AS documentId,
-            b.content AS blockContent,
-            d.content AS docTitle
+    `SELECT r.def_block_id AS blockId,
+            b.content AS blockContent
      FROM refs r
      LEFT JOIN blocks b ON b.id = r.def_block_id
-     LEFT JOIN blocks d ON d.id = r.def_block_root_id AND d.type = 'd'
      WHERE r.type = 'ref_id'
        AND r.root_id = '${escapedId}'
        AND r.def_block_root_id != '${escapedId}'`
-  ) as Array<{ blockId: string; documentId: string; blockContent: string | null; docTitle: string | null }>
+  ) as Array<{ blockId: string; blockContent: string | null }>
 
-  const result = new Map<string, ExtractedDocRef>()
-  for (const row of rows) {
-    const existing = result.get(row.documentId)
-    if (!existing) {
-      result.set(row.documentId, {
-        documentId: row.documentId,
-        anchorText: row.docTitle || row.blockContent || undefined,
-      })
-    }
-  }
-  return [...result.values()]
+  return rows.map(row => ({
+    documentId: row.blockId,
+    anchorText: row.blockContent || undefined,
+  }))
 }
 
 export async function fetchKramdownOutboundDocRefs(kramdown: string): Promise<ExtractedDocRef[]> {
-  const blockRefs = extractKramdownBlockIds(kramdown)
+  const blockRefs = extractKramdownBlockRefs(kramdown)
   const withAnchor = blockRefs.filter(r => r.anchorText)
   const withoutAnchor = blockRefs.filter(r => !r.anchorText)
 
@@ -110,11 +74,16 @@ export async function fetchKramdownOutboundDocRefs(kramdown: string): Promise<Ex
   }
 
   if (withoutAnchor.length > 0) {
-    const ids = withoutAnchor.map(r => r.blockId)
-    const resolved = await resolveBlockIdsToDocRefs(ids)
-    for (const ref of resolved) {
-      if (!result.has(ref.documentId)) {
-        result.set(ref.documentId, ref)
+    const ids = withoutAnchor.map(r => `'${r.blockId.replace(/'/g, "''")}'`).join(',')
+    const rows = await sql(
+      `SELECT id AS blockId, content AS blockContent FROM blocks WHERE id IN (${ids})`
+    ) as Array<{ blockId: string; blockContent: string | null }>
+    for (const row of rows) {
+      if (!result.has(row.blockId)) {
+        result.set(row.blockId, {
+          documentId: row.blockId,
+          anchorText: row.blockContent || undefined,
+        })
       }
     }
   }
