@@ -297,11 +297,6 @@ export function createAnalyticsWikiActionsController(params: {
         console.info('[NetworkLens][Wiki] All unchanged but no existing page found, proceeding with AI generation')
       }
 
-      const sourceDocumentTimestamps: Record<string, string> = {}
-      for (const doc of effectiveSourceDocuments) {
-        sourceDocumentTimestamps[doc.id] = doc.updated
-      }
-
       let existingWikiContent: string | undefined
       if (isIncremental && storedRecord) {
         const pageHPath = wikiContainerPath ? `${wikiContainerPath}/${pageTitle}` : `${themeDocument.hpath}/${pageTitle}`
@@ -324,162 +319,225 @@ export function createAnalyticsWikiActionsController(params: {
 
       const scopedDocumentMap = new Map(scopedDocuments.map(document => [document.id, document]))
 
+      const maxSourceDocs = params.appliedConfig.value.wikiMaxSourceDocs ?? 10
       const batchSize = params.appliedConfig.value.wikiBatchSize ?? 0
-      const changedDocIds = [...deltaMap.entries()]
+
+      const allChangedDocIds = [...deltaMap.entries()]
         .filter(([, status]) => status === 'new' || status === 'changed')
         .map(([id]) => id)
 
-      const useBatchMode = batchSize > 0 && changedDocIds.length > batchSize
+      const coreDocIds = new Set(params.report.value.ranking.map(item => item.documentId))
+      const bridgeDocIds = new Set(params.report.value.bridgeDocuments.map(item => item.documentId))
 
-      let finalPayload: WikiThemeBundle
-      let finalDiagnosis: WikiTemplateDiagnosis
-      let finalPagePlan: WikiPagePlan
-      let finalSections: WikiSectionDraft[]
+      const sortedChangedIds = [...allChangedDocIds].sort((a, b) => {
+        const priorityA = coreDocIds.has(a) ? 0 : bridgeDocIds.has(a) ? 1 : 2
+        const priorityB = coreDocIds.has(b) ? 0 : bridgeDocIds.has(b) ? 1 : 2
+        return priorityA - priorityB
+      })
+
+      const MAX_CYCLES = 3
+      const docsPerCycle = maxSourceDocs > 0 ? maxSourceDocs : sortedChangedIds.length
+      const totalCycles = docsPerCycle > 0 ? Math.ceil(sortedChangedIds.length / docsPerCycle) : 0
+      const actualCycles = Math.min(totalCycles, MAX_CYCLES)
+      const processedDocIds = new Set<string>()
       let currentWikiContent = existingWikiContent
 
-      if (useBatchMode) {
-        const coreDocIds = new Set(params.report.value.ranking.map(item => item.documentId))
-        const bridgeDocIds = new Set(params.report.value.bridgeDocuments.map(item => item.documentId))
+      let finalDiagnosis: WikiTemplateDiagnosis | undefined
+      let finalPagePlan: WikiPagePlan | undefined
+      let finalSections: WikiSectionDraft[] = []
 
-        const sortedChangedIds = [...changedDocIds].sort((a, b) => {
-          const priorityA = coreDocIds.has(a) ? 0 : bridgeDocIds.has(a) ? 1 : 2
-          const priorityB = coreDocIds.has(b) ? 0 : bridgeDocIds.has(b) ? 1 : 2
-          return priorityA - priorityB
-        })
+      console.info('[NetworkLens][Wiki] Processing plan:', {
+        totalChangedDocs: allChangedDocIds.length,
+        docsPerCycle,
+        totalCycles,
+        actualCycles,
+        batchSize,
+      })
 
-        const batches: string[][] = []
-        for (let i = 0; i < sortedChangedIds.length; i += batchSize) {
-          batches.push(sortedChangedIds.slice(i, i + batchSize))
+      for (let cycleIndex = 0; cycleIndex < actualCycles; cycleIndex++) {
+        const cycleStart = cycleIndex * docsPerCycle
+        const cycleDocIds = sortedChangedIds.slice(cycleStart, cycleStart + docsPerCycle)
+        const cycleDocIdSet = new Set(cycleDocIds)
+        for (const id of cycleDocIds) {
+          processedDocIds.add(id)
         }
 
-        console.info('[NetworkLens][Wiki] Batch mode:', {
-          batchSize,
-          changedDocCount: changedDocIds.length,
-          batchCount: batches.length,
+        const cycleDeltaMap = new Map(
+          [...deltaMap.entries()].map(([id, status]) => {
+            if (cycleDocIdSet.has(id)) return [id, status] as const
+            if (processedDocIds.has(id)) return [id, 'unchanged' as const]
+            return [id, 'unchanged' as const]
+          })
+        )
+
+        const cyclePayload = buildSingleThemeWikiPayload({
+          config: params.appliedConfig.value,
+          themeDocument,
+          sourceDocuments: effectiveSourceDocuments,
+          report: params.report.value,
+          trends: params.trends.value,
+          documentMap: scopedDocumentMap,
+          getDocumentProfile: document => sourceProfileMap.get(document.id) ?? null,
+          deltaMap: cycleDeltaMap,
+          isIncremental: isIncrementalUpdate || cycleIndex > 0,
         })
 
-        let batchDiagnosis: WikiTemplateDiagnosis | undefined
-        let batchPagePlan: WikiPagePlan | undefined
-        let batchSections: WikiSectionDraft[] = []
+        console.info('[NetworkLens][Wiki] Cycle', cycleIndex + 1, '/', actualCycles, {
+          cycleDocIds,
+          cycleDocCount: cycleDocIds.length,
+        })
 
-        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-          const batchDocIds = new Set(batches[batchIndex])
-          const batchDocuments = effectiveSourceDocuments.filter(doc => batchDocIds.has(doc.id))
-          const batchDeltaMap = new Map(
-            [...deltaMap.entries()].map(([id, status]) => [id, batchDocIds.has(id) ? status : 'unchanged' as const])
-          )
+        const useBatchInCycle = batchSize > 0 && cycleDocIds.length > batchSize
 
-          const batchPayload = buildSingleThemeWikiPayload({
+        if (useBatchInCycle) {
+          const batches: string[][] = []
+          for (let i = 0; i < cycleDocIds.length; i += batchSize) {
+            batches.push(cycleDocIds.slice(i, i + batchSize))
+          }
+
+          let batchDiagnosis: WikiTemplateDiagnosis | undefined
+          let batchPagePlan: WikiPagePlan | undefined
+          let batchSections: WikiSectionDraft[] = []
+
+          for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+            const batchDocIdSet = new Set(batches[batchIndex])
+            const batchDeltaMap = new Map(
+              [...deltaMap.entries()].map(([id, status]) => {
+                if (batchDocIdSet.has(id)) return [id, status] as const
+                if (processedDocIds.has(id)) return [id, 'unchanged' as const]
+                return [id, 'unchanged' as const]
+              })
+            )
+
+            const batchPayload = buildSingleThemeWikiPayload({
+              config: params.appliedConfig.value,
+              themeDocument,
+              sourceDocuments: effectiveSourceDocuments,
+              report: params.report.value,
+              trends: params.trends.value,
+              documentMap: scopedDocumentMap,
+              getDocumentProfile: document => sourceProfileMap.get(document.id) ?? null,
+              deltaMap: batchDeltaMap,
+              isIncremental: isIncrementalUpdate || cycleIndex > 0 || batchIndex > 0,
+            })
+
+            console.info('[NetworkLens][Wiki] Cycle', cycleIndex + 1, 'Batch', batchIndex + 1, '/', batches.length)
+
+            batchDiagnosis = await params.aiWikiService.diagnoseThemeTemplate({
+              config: params.appliedConfig.value,
+              payload: batchPayload,
+              existingWikiContent: currentWikiContent,
+              isIncremental: isIncrementalUpdate || cycleIndex > 0 || batchIndex > 0,
+            })
+            batchPagePlan = await params.aiWikiService.planThemePage({
+              config: params.appliedConfig.value,
+              payload: batchPayload,
+              diagnosis: batchDiagnosis,
+              existingWikiContent: currentWikiContent,
+              isIncremental: isIncrementalUpdate || cycleIndex > 0 || batchIndex > 0,
+            })
+            batchSections = await Promise.all(batchPagePlan.sectionOrder.map(sectionType => params.aiWikiService!.generateThemeSection({
+              config: params.appliedConfig.value,
+              payload: batchPayload,
+              diagnosis: batchDiagnosis,
+              pagePlan: batchPagePlan,
+              sectionType,
+              existingWikiContent: currentWikiContent,
+              isIncremental: isIncrementalUpdate || cycleIndex > 0 || batchIndex > 0,
+            })))
+
+            const batchTitleMap = Object.fromEntries(batchPayload.sourceDocuments.map(doc => [doc.documentId, doc.title]))
+            const batchDraft = renderThemeWikiDraft({
+              pageTitle: batchPayload.pageTitle,
+              pairedThemeDocumentId: batchPayload.themeDocumentId,
+              pairedThemeTitle: batchPayload.themeDocumentTitle,
+              generatedAt,
+              model: params.appliedConfig.value.aiModel?.trim() || 'unknown',
+              sourceDocumentCount: batchPayload.sourceDocuments.length,
+              diagnosis: batchDiagnosis,
+              pagePlan: batchPagePlan,
+              sections: batchSections,
+              sourceDocumentTitleMap: batchTitleMap,
+            })
+
+            currentWikiContent = batchDraft.managedMarkdown
+          }
+
+          finalDiagnosis = batchDiagnosis!
+          finalPagePlan = batchPagePlan!
+          finalSections = batchSections
+        } else {
+          finalDiagnosis = await params.aiWikiService.diagnoseThemeTemplate({
             config: params.appliedConfig.value,
-            themeDocument,
-            sourceDocuments: effectiveSourceDocuments,
-            report: params.report.value,
-            trends: params.trends.value,
-            documentMap: scopedDocumentMap,
-            getDocumentProfile: document => sourceProfileMap.get(document.id) ?? null,
-            deltaMap: batchDeltaMap,
-            isIncremental: isIncrementalUpdate,
-          })
-
-          console.info('[NetworkLens][Wiki] Batch', batchIndex + 1, '/', batches.length, {
-            batchDocIds: [...batchDocIds],
-            batchDocCount: batchDocuments.length,
-          })
-
-          batchDiagnosis = await params.aiWikiService.diagnoseThemeTemplate({
-            config: params.appliedConfig.value,
-            payload: batchPayload,
+            payload: cyclePayload,
             existingWikiContent: currentWikiContent,
-            isIncremental: isIncrementalUpdate,
+            isIncremental: isIncrementalUpdate || cycleIndex > 0,
           })
-          batchPagePlan = await params.aiWikiService.planThemePage({
+          finalPagePlan = await params.aiWikiService.planThemePage({
             config: params.appliedConfig.value,
-            payload: batchPayload,
-            diagnosis: batchDiagnosis,
+            payload: cyclePayload,
+            diagnosis: finalDiagnosis,
             existingWikiContent: currentWikiContent,
-            isIncremental: isIncrementalUpdate,
+            isIncremental: isIncrementalUpdate || cycleIndex > 0,
           })
-          batchSections = await Promise.all(batchPagePlan.sectionOrder.map(sectionType => params.aiWikiService!.generateThemeSection({
+          finalSections = await Promise.all(finalPagePlan.sectionOrder.map(sectionType => params.aiWikiService!.generateThemeSection({
             config: params.appliedConfig.value,
-            payload: batchPayload,
-            diagnosis: batchDiagnosis,
-            pagePlan: batchPagePlan,
+            payload: cyclePayload,
+            diagnosis: finalDiagnosis,
+            pagePlan: finalPagePlan,
             sectionType,
             existingWikiContent: currentWikiContent,
-            isIncremental: isIncrementalUpdate,
+            isIncremental: isIncrementalUpdate || cycleIndex > 0,
           })))
 
-          const batchTitleMap = Object.fromEntries(batchPayload.sourceDocuments.map(doc => [doc.documentId, doc.title]))
-          const batchDraft = renderThemeWikiDraft({
-            pageTitle: batchPayload.pageTitle,
-            pairedThemeDocumentId: batchPayload.themeDocumentId,
-            pairedThemeTitle: batchPayload.themeDocumentTitle,
+          const cycleTitleMap = Object.fromEntries(cyclePayload.sourceDocuments.map(doc => [doc.documentId, doc.title]))
+          const cycleDraft = renderThemeWikiDraft({
+            pageTitle: cyclePayload.pageTitle,
+            pairedThemeDocumentId: cyclePayload.themeDocumentId,
+            pairedThemeTitle: cyclePayload.themeDocumentTitle,
             generatedAt,
             model: params.appliedConfig.value.aiModel?.trim() || 'unknown',
-            sourceDocumentCount: batchPayload.sourceDocuments.length,
-            diagnosis: batchDiagnosis,
-            pagePlan: batchPagePlan,
-            sections: batchSections,
-            sourceDocumentTitleMap: batchTitleMap,
+            sourceDocumentCount: cyclePayload.sourceDocuments.length,
+            diagnosis: finalDiagnosis,
+            pagePlan: finalPagePlan,
+            sections: finalSections,
+            sourceDocumentTitleMap: cycleTitleMap,
           })
 
-          currentWikiContent = batchDraft.managedMarkdown
+          currentWikiContent = cycleDraft.managedMarkdown
         }
-
-        finalPayload = buildSingleThemeWikiPayload({
-          config: params.appliedConfig.value,
-          themeDocument,
-          sourceDocuments: effectiveSourceDocuments,
-          report: params.report.value,
-          trends: params.trends.value,
-          documentMap: scopedDocumentMap,
-          getDocumentProfile: document => sourceProfileMap.get(document.id) ?? null,
-          deltaMap,
-          isIncremental: isIncrementalUpdate,
-        })
-        finalDiagnosis = batchDiagnosis!
-        finalPagePlan = batchPagePlan!
-        finalSections = batchSections
-      } else {
-        finalPayload = buildSingleThemeWikiPayload({
-          config: params.appliedConfig.value,
-          themeDocument,
-          sourceDocuments: effectiveSourceDocuments,
-          report: params.report.value,
-          trends: params.trends.value,
-          documentMap: scopedDocumentMap,
-          getDocumentProfile: document => sourceProfileMap.get(document.id) ?? null,
-          deltaMap,
-          isIncremental: isIncrementalUpdate,
-        })
-
-        finalDiagnosis = await params.aiWikiService.diagnoseThemeTemplate({
-          config: params.appliedConfig.value,
-          payload: finalPayload,
-          existingWikiContent,
-          isIncremental: isIncrementalUpdate,
-        })
-        finalPagePlan = await params.aiWikiService.planThemePage({
-          config: params.appliedConfig.value,
-          payload: finalPayload,
-          diagnosis: finalDiagnosis,
-          existingWikiContent,
-          isIncremental: isIncrementalUpdate,
-        })
-        finalSections = await Promise.all(finalPagePlan.sectionOrder.map(sectionType => params.aiWikiService!.generateThemeSection({
-          config: params.appliedConfig.value,
-          payload: finalPayload,
-          diagnosis: finalDiagnosis,
-          pagePlan: finalPagePlan,
-          sectionType,
-          existingWikiContent,
-          isIncremental: isIncrementalUpdate,
-        })))
       }
 
-      const payload = finalPayload
-      const diagnosis = finalDiagnosis
-      const pagePlan = finalPagePlan
+      const sourceDocumentTimestamps: Record<string, string> = {}
+      const previousTimestamps = storedRecord?.sourceDocumentTimestamps
+      for (const doc of effectiveSourceDocuments) {
+        if (processedDocIds.has(doc.id) || (previousTimestamps && previousTimestamps[doc.id])) {
+          sourceDocumentTimestamps[doc.id] = doc.updated
+        }
+      }
+
+      const remainingDocCount = sortedChangedIds.length - processedDocIds.size
+      if (remainingDocCount > 0) {
+        params.notify(
+          t('settings.wiki.remainingDocsNotice', { processed: processedDocIds.size, remaining: remainingDocCount }),
+          5000,
+          'info',
+        )
+      }
+
+      const payload = buildSingleThemeWikiPayload({
+        config: params.appliedConfig.value,
+        themeDocument,
+        sourceDocuments: effectiveSourceDocuments,
+        report: params.report.value,
+        trends: params.trends.value,
+        documentMap: scopedDocumentMap,
+        getDocumentProfile: document => sourceProfileMap.get(document.id) ?? null,
+        deltaMap,
+        isIncremental: isIncrementalUpdate,
+      })
+      const diagnosis = finalDiagnosis!
+      const pagePlan = finalPagePlan!
       const sections = finalSections
       const sourceDocumentTitleMap = Object.fromEntries(payload.sourceDocuments.map(doc => [doc.documentId, doc.title]))
       const draft = renderThemeWikiDraft({

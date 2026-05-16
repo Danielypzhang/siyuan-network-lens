@@ -108,6 +108,7 @@ export interface PluginConfig {
   wikiHallucinationMarkingEnabled?: boolean
   wikiSourceCitationMode?: WikiSourceCitationMode
   wikiBatchSize?: number
+  wikiMaxSourceDocs?: number
   summaryCardOrder?: string[]
 }
 
@@ -152,6 +153,7 @@ export const DEFAULT_CONFIG: PluginConfig = {
   wikiHallucinationMarkingEnabled: true,
   wikiSourceCitationMode: 'inline',
   wikiBatchSize: 0,
+  wikiMaxSourceDocs: 10,
   summaryCardOrder: undefined,
 }
 
@@ -298,6 +300,9 @@ export function ensureConfigDefaults(config: PluginConfig) {
   }
   if (typeof config.wikiBatchSize !== 'number' || config.wikiBatchSize < 0) {
     config.wikiBatchSize = 0
+  }
+  if (typeof config.wikiMaxSourceDocs !== 'number' || config.wikiMaxSourceDocs < 0) {
+    config.wikiMaxSourceDocs = 10
   }
   ensureAiProviderConfigState(config)
 }

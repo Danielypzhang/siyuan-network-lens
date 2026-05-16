@@ -174,6 +174,17 @@
           </select>
           <span class="setting-field__hint">{{ t('settings.wiki.batchSizeDescription') }}</span>
         </div>
+        <div v-if="showWikiSettings" class="setting-field setting-field--full">
+          <span>{{ t('settings.wiki.maxSourceDocs') }}</span>
+          <select v-model.number="config.wikiMaxSourceDocs">
+            <option :value="0">{{ t('settings.wiki.generationModeFull') }} (No limit)</option>
+            <option :value="5">5</option>
+            <option :value="10">10</option>
+            <option :value="15">15</option>
+            <option :value="20">20</option>
+          </select>
+          <span class="setting-field__hint">{{ t('settings.wiki.maxSourceDocsDescription') }}</span>
+        </div>
         <label v-if="showWikiSettings" class="setting-item setting-item--full">
           <span class="setting-item__text">
             <strong>{{ t('settings.wiki.hallucinationMarking') }}</strong>

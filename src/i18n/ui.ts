@@ -530,6 +530,18 @@ const UI_TEXT = {
         en_US: 'Number of source documents sent per AI call. 0 = send all at once. 1 = send one document at a time (iterative update). 2-5 = send in small batches. Lower values reduce token usage but increase AI calls.',
         zh_CN: '每次 AI 调用发送的源文档数量。0 = 一次性发送全部。1 = 逐个发送（循环更新）。2-5 = 小批量发送。数值越小 token 消耗越低，但 AI 调用次数越多。',
       },
+      maxSourceDocs: {
+        en_US: 'Max source docs per cycle',
+        zh_CN: '每轮最大处理文档数',
+      },
+      maxSourceDocsDescription: {
+        en_US: 'Maximum number of new/changed documents processed per AI cycle. 0 = no limit. If documents remain unprocessed, you can run Wiki maintenance again to continue.',
+        zh_CN: '每轮 AI 处理的最大新增/变更文档数。0 = 不限制。如有文档未处理，可再次点击维护 Wiki 继续。',
+      },
+      remainingDocsNotice: {
+        en_US: '{processed} documents processed, {remaining} documents pending. Run Wiki maintenance again to continue.',
+        zh_CN: '已处理 {processed} 个文档，剩余 {remaining} 个文档待处理。可再次点击维护 Wiki 继续。',
+      },
     },
   },
   summaryDetail: {
