@@ -252,7 +252,7 @@
 <script setup lang="ts">
 import type { RankingDetailItem } from '@/analytics/summary-details'
 import type { LinkAssociations } from '@/analytics/link-associations'
-import { fetchOutboundBlockRefDocumentIds } from '@/analytics/link-associations'
+import { extractKramdownDocumentIds, fetchOutboundBlockRefDocumentIds } from '@/analytics/link-associations'
 import type { LinkDirection } from '@/analytics/link-sync'
 import type { WikiPreviewState } from '@/composables/use-analytics'
 import { ref } from 'vue'
@@ -303,6 +303,7 @@ const props = withDefaults(defineProps<{
   variant?: 'panel' | 'detail'
   collapsedItems?: Record<string, boolean>
   onToggleItemCollapse?: (documentId: string) => void
+  getBlockKramdown?: (id: string) => Promise<{ id: string; kramdown: string }>
 }>(), {
   showWikiPanelActions: true,
   variant: 'panel',
@@ -325,12 +326,27 @@ async function handleToggleLinkPanel(documentId: string) {
     return
   }
   if (extraOutboundDocIdsMap.value.has(documentId)) return
+
+  const allIds = new Set<string>()
+
   try {
     const docIds = await fetchOutboundBlockRefDocumentIds(documentId)
-    extraOutboundDocIdsMap.value.set(documentId, docIds)
+    for (const id of docIds) allIds.add(id)
   } catch {
-    extraOutboundDocIdsMap.value.set(documentId, [])
+    // SQL failed, continue with kramdown fallback
   }
+
+  if (props.getBlockKramdown) {
+    try {
+      const { kramdown } = await props.getBlockKramdown(documentId)
+      const kramdownIds = extractKramdownDocumentIds(kramdown)
+      for (const id of kramdownIds) allIds.add(id)
+    } catch {
+      // kramdown failed
+    }
+  }
+
+  extraOutboundDocIdsMap.value.set(documentId, [...allIds])
 }
 
 function resolveAssociations(documentId: string): LinkAssociations {

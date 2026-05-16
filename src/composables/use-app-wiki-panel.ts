@@ -1,6 +1,6 @@
 import { ref, type ComputedRef } from 'vue'
 
-import { fetchOutboundBlockRefDocumentIds } from '@/analytics/link-associations'
+import { extractKramdownDocumentIds, fetchOutboundBlockRefDocumentIds } from '@/analytics/link-associations'
 import { buildSiyuanBlockLinkMarkdown } from '@/analytics/link-sync'
 import { normalizeWikiSourceDocLinkTypes, type WikiSourceDocLinkType } from '@/analytics/wiki-source-docs'
 import { t } from '@/i18n/ui'
@@ -25,6 +25,7 @@ export function createAppWikiPanelController(params: {
   resolveTitle: (documentId: string) => string
   prepareWikiPreview: (request?: WikiPreviewRequest) => Promise<void>
   onSwitchDocument: (themeDocumentId: string) => void | Promise<void>
+  getBlockKramdown?: (id: string) => Promise<{ id: string; kramdown: string }>
 }) {
   const wikiPanelPlacement = ref<'ranking' | ''>('')
   const wikiPanelCoreDocumentId = ref('')
@@ -66,17 +67,35 @@ export function createAppWikiPanelController(params: {
       pushLinkType(sourceDocumentLinkTypes, item.documentId, 'child')
     }
 
+    const allRefIds = new Set<string>()
+
     try {
-        const blockRefDocIds = await fetchOutboundBlockRefDocumentIds(documentId)
-        for (const refId of blockRefDocIds) {
-          if (!sourceDocumentLinkTypes.has(refId)) {
+      const blockRefDocIds = await fetchOutboundBlockRefDocumentIds(documentId)
+      for (const refId of blockRefDocIds) {
+        if (!sourceDocumentLinkTypes.has(refId)) {
+          pushLinkType(sourceDocumentLinkTypes, refId, 'outbound')
+          sourceDocumentIds.push(refId)
+        }
+        allRefIds.add(refId)
+      }
+    } catch {
+      // SQL failed, continue with kramdown fallback
+    }
+
+    if (params.getBlockKramdown) {
+      try {
+        const { kramdown } = await params.getBlockKramdown(documentId)
+        const kramdownIds = extractKramdownDocumentIds(kramdown)
+        for (const refId of kramdownIds) {
+          if (!allRefIds.has(refId) && !sourceDocumentLinkTypes.has(refId)) {
             pushLinkType(sourceDocumentLinkTypes, refId, 'outbound')
             sourceDocumentIds.push(refId)
           }
         }
       } catch {
-        // silently ignore
+        // kramdown failed
       }
+    }
 
     activeWikiPreviewRequest.value = {
       sourceDocumentIds: [...new Set(sourceDocumentIds)],

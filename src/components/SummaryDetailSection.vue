@@ -543,6 +543,7 @@
           :is-link-group-expanded="isLinkGroupExpanded"
           :is-syncing="isSyncing"
           :sync-association="syncAssociation"
+          :get-block-kramdown="getBlockKramdown"
           :wiki-panel-props="wikiPanelProps"
           :is-wiki-panel-visible-for-core-document="isCoreDocumentWikiPanelVisible"
           :toggle-core-document-wiki-panel="toggleCoreDocumentWikiPanel"
@@ -849,6 +850,7 @@ const props = withDefaults(defineProps<{
   isLinkGroupExpanded: (documentId: string, direction: LinkDirection) => boolean
   isSyncing: (coreDocumentId: string, targetDocumentId: string, direction: LinkDirection) => boolean
   syncAssociation: (coreDocumentId: string, targetDocumentId: string, direction: LinkDirection) => Promise<void>
+  getBlockKramdown?: (id: string) => Promise<{ id: string; kramdown: string }>
   formatDelta: (delta: number) => string
   themeDocumentIds: Set<string>
   themeDocuments: ThemeDocument[]
