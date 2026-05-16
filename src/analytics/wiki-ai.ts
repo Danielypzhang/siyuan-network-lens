@@ -1,4 +1,5 @@
 import { isAiConfigComplete, limitChatCompletionMessages, resolveAiEndpoint, resolveAiRequestOptions } from './ai-inbox'
+import { truncateSourceBlocksToTokenBudget } from './document-index-source-blocks'
 import type { WikiThemeBundle } from './wiki-generation'
 import {
   WIKI_OPTIONAL_SECTION_TYPES,
@@ -126,22 +127,65 @@ function buildWikiUserPayload(params: {
   pagePlan?: WikiPagePlan
   sectionType?: WikiSectionType
   existingWikiContent?: string
+  maxInputTokens?: number
+  systemPromptChars?: number
 }): string {
-  const { payload, diagnosis, pagePlan, sectionType, existingWikiContent } = params
+  const { payload, diagnosis, pagePlan, sectionType, existingWikiContent, maxInputTokens, systemPromptChars } = params
+
+  const CHARS_PER_TOKEN = 2.5
+  const systemPromptTokens = (systemPromptChars ?? 0) / CHARS_PER_TOKEN
+  const existingWikiTokens = existingWikiContent
+    ? (existingWikiContent.length + 50) / CHARS_PER_TOKEN
+    : 0
+  const userPromptOverheadTokens = 300
+  const reservedTokens = systemPromptTokens + existingWikiTokens + userPromptOverheadTokens
+
+  const availableTokens = maxInputTokens
+    ? Math.max(0, maxInputTokens - reservedTokens)
+    : Infinity
+  const availableChars = availableTokens * CHARS_PER_TOKEN
+
+  let sourceDocChars = 0
+  const sourceDocuments = payload.sourceDocuments.map(doc => {
+    const base: any = {
+      documentId: doc.documentId,
+      title: doc.title,
+      positioning: doc.positioning,
+      propositions: doc.propositions,
+      keywords: doc.keywords,
+    }
+    if (doc.sourceBlockTexts && doc.sourceBlockTexts.length > 0) {
+      const totalTextLen = doc.sourceBlockTexts.reduce((sum, t) => sum + t.length, 0)
+      if (sourceDocChars + totalTextLen <= availableChars) {
+        base.sourceBlockTexts = doc.sourceBlockTexts
+        sourceDocChars += totalTextLen
+      } else {
+        const remaining = availableChars - sourceDocChars
+        if (remaining > 100) {
+          let used = 0
+          const truncated: string[] = []
+          for (const text of doc.sourceBlockTexts) {
+            if (used + text.length > remaining) {
+              truncated.push(text.slice(0, remaining - used))
+              break
+            }
+            truncated.push(text)
+            used += text.length
+          }
+          base.sourceBlockTexts = truncated
+          sourceDocChars += used
+        }
+      }
+    }
+    return base
+  })
 
   const bundleForAi: any = {
     themeName: payload.themeName,
     pageTitle: payload.pageTitle,
     themeDocumentId: payload.themeDocumentId,
     themeDocumentTitle: payload.themeDocumentTitle,
-    sourceDocuments: payload.sourceDocuments.map(doc => ({
-      documentId: doc.documentId,
-      title: doc.title,
-      positioning: doc.positioning,
-      propositions: doc.propositions,
-      keywords: doc.keywords,
-      ...(doc.sourceBlockTexts && doc.sourceBlockTexts.length > 0 ? { sourceBlockTexts: doc.sourceBlockTexts } : {}),
-    })),
+    sourceDocuments,
     templateSignals: payload.templateSignals,
     analysisSignals: payload.analysisSignals,
   }

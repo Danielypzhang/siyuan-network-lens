@@ -1,7 +1,7 @@
 import type { DocumentRecord } from './analysis'
 import type { AiDocumentIndexStore } from './ai-index-store'
 import type { ClassifiedSourceBlocks } from './document-index-source-blocks'
-import { collectDocumentSourceBlocks } from './document-index-source-blocks'
+import { collectDocumentSourceBlocks, truncateSourceBlocksToTokenBudget } from './document-index-source-blocks'
 import { normalizeTags, resolveDocumentTitle } from './document-utils'
 import { isAiConfigComplete, resolveAiEndpoint, resolveAiRequestOptions } from './ai-inbox'
 import { t } from '@/i18n/ui'
@@ -187,6 +187,8 @@ export async function ensureDocumentSummary(params: {
   }
 }
 
+const CHARS_PER_TOKEN = 2.5
+
 const EVIDENCE_COMPILATION_SYSTEM_PROMPT = `You are an evidence compiler for a personal knowledge base. Read a document and its evidence blocks, then produce a structured index.
 
 Return ONLY a valid JSON object. No markdown fences, no explanation, no extra text before or after the JSON.
@@ -226,7 +228,12 @@ async function requestEvidenceCompilation(params: {
   const title = resolveDocumentTitle(params.sourceDocument)
   const tags = normalizeTags(params.sourceDocument.tags)
 
-  const allBlocks = [...params.sourceBlocks.primary, ...params.sourceBlocks.secondary]
+  const requestOptions = resolveAiRequestOptions(params.config)
+  const allBlocks = truncateSourceBlocksToTokenBudget({
+    blocks: [...params.sourceBlocks.primary, ...params.sourceBlocks.secondary],
+    maxInputTokens: requestOptions.maxTokens,
+    reservedPromptTokens: EVIDENCE_COMPILATION_SYSTEM_PROMPT.length / CHARS_PER_TOKEN + 200,
+  })
   const blockSection = allBlocks.length > 0
     ? allBlocks.map(block => `[${block.blockId}] ${block.text}`).join('\n\n')
     : '(No evidence blocks extracted)'
@@ -240,7 +247,6 @@ async function requestEvidenceCompilation(params: {
     blockSection,
   ].filter(Boolean).join('\n')
 
-  const requestOptions = resolveAiRequestOptions(params.config)
   const endpoint = resolveAiEndpoint(params.config.aiBaseUrl!, 'chat/completions')
   const body = JSON.stringify({
     model: params.config.aiModel,
