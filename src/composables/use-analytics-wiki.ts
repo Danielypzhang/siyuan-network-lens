@@ -117,12 +117,10 @@ export async function buildWikiSourceProfileMap(params: {
   config: PluginConfig
   aiIndexStore: AiDocumentIndexStore | null
   forwardProxy?: (url: string, method?: string, payload?: any, headers?: any[], timeout?: number, contentType?: string) => Promise<IResForwardProxy>
-  getChildBlocks?: GetChildBlocksFn
   getBlockKramdown?: GetBlockKramdownFn
   generatedAt: string
-  blockRefIds?: Set<string>
 }) {
-  if (!params.aiIndexStore || !params.forwardProxy || !params.getChildBlocks || !params.getBlockKramdown) {
+  if (!params.aiIndexStore || !params.forwardProxy || !params.getBlockKramdown) {
     throw new Error('Wiki topic bundle requires AI document index dependencies')
   }
 
@@ -139,11 +137,9 @@ export async function buildWikiSourceProfileMap(params: {
           sourceDocument: document,
           indexStore: params.aiIndexStore,
           forwardProxy: params.forwardProxy,
-          getChildBlocks: params.getChildBlocks,
           getBlockKramdown: params.getBlockKramdown,
           updatedAt: params.generatedAt,
           force: attempt > 0,
-          isBlockLevelRef: params.blockRefIds?.has(document.id),
         })
         ensured = true
         break

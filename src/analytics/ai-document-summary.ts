@@ -18,7 +18,6 @@ type ForwardProxyFn = (
   contentType?: string,
 ) => Promise<IResForwardProxy>
 
-type GetChildBlocksFn = (id: string) => Promise<Array<{ id: string, type?: string, subtype?: string }>>
 type GetBlockKramdownFn = (id: string) => Promise<{ id: string, kramdown: string }>
 
 type AiConfig = Pick<
@@ -89,11 +88,9 @@ export async function ensureDocumentIndex(params: {
   sourceDocument: DocumentRecord
   indexStore: Pick<AiDocumentIndexStore, 'getFreshDocumentProfile' | 'saveDocumentIndex'>
   forwardProxy: ForwardProxyFn
-  getChildBlocks: GetChildBlocksFn
   getBlockKramdown: GetBlockKramdownFn
   force?: boolean
   updatedAt?: string
-  isBlockLevelRef?: boolean
 }): Promise<{ fromCache: boolean, updatedAt: string }> {
   const sourceUpdatedAt = params.sourceDocument.updated ?? ''
 
@@ -115,9 +112,7 @@ export async function ensureDocumentIndex(params: {
 
   const sourceBlocks = await collectDocumentSourceBlocks({
     documentId: params.sourceDocument.id,
-    getChildBlocks: params.getChildBlocks,
     getBlockKramdown: params.getBlockKramdown,
-    isBlockLevelRef: params.isBlockLevelRef,
   })
 
   const result = await requestEvidenceCompilation({
@@ -146,7 +141,6 @@ export async function ensureDocumentSummary(params: {
   sourceDocument: DocumentRecord
   indexStore?: Pick<AiDocumentIndexStore, 'getFreshDocumentSummary' | 'saveDocumentIndex'> | null
   forwardProxy?: ForwardProxyFn
-  getChildBlocks?: GetChildBlocksFn
   getBlockKramdown?: GetBlockKramdownFn
   force?: boolean
   updatedAt?: string
@@ -160,7 +154,7 @@ export async function ensureDocumentSummary(params: {
     return { ...freshSummary, fromCache: true }
   }
 
-  if (!params.forwardProxy || !params.getChildBlocks || !params.getBlockKramdown) {
+  if (!params.forwardProxy || !params.getBlockKramdown) {
     throw new Error(t('analytics.docSummary.aiRequired'))
   }
 
@@ -169,7 +163,6 @@ export async function ensureDocumentSummary(params: {
     sourceDocument: params.sourceDocument,
     indexStore: params.indexStore!,
     forwardProxy: params.forwardProxy,
-    getChildBlocks: params.getChildBlocks,
     getBlockKramdown: params.getBlockKramdown,
     force: params.force,
     updatedAt: params.updatedAt,
