@@ -256,6 +256,7 @@
       :wiki-pages="llmWikiPages"
       :forward-proxy="forwardProxy"
       :get-block-kramdown="getBlockKramdown"
+      :get-active-document-content="getActiveDocumentContent"
       :wiki-store="aiWikiStore ?? undefined"
       :update-block="updateBlock"
       :config="{

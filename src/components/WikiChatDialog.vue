@@ -11,6 +11,7 @@ const props = defineProps<{
   wikiPages: WikiIndexPage[]
   forwardProxy: (url: string, method?: string, payload?: any, headers?: any[], timeout?: number, contentType?: string) => Promise<any>
   getBlockKramdown: (id: string) => Promise<{ id: string, kramdown: string }>
+  getActiveDocumentContent?: () => Promise<{ documentId: string, title: string, content: string, isZoomedIn: boolean }>
   config: {
     aiBaseUrl: string
     aiApiKey: string
@@ -51,6 +52,7 @@ const {
   filteredPages,
   sendMessage,
   switchSource,
+  switchToActiveDoc,
   buildSaveMarkdown,
 } = chatSession
 
@@ -58,6 +60,8 @@ const messagesRef = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
 const mentionSelectedIndex = ref(0)
 const MAX_VISIBLE_MENTION_ITEMS = 20
+const showActiveDocOption = computed(() => !!props.getActiveDocumentContent)
+const activeDocOffset = computed(() => showActiveDocOption.value ? 1 : 0)
 const visibleMentionPages = computed(() => filteredPages.value.slice(0, MAX_VISIBLE_MENTION_ITEMS))
 const hasMoreMentions = computed(() => filteredPages.value.length > MAX_VISIBLE_MENTION_ITEMS)
 
@@ -89,24 +93,32 @@ function handleInput() {
 }
 
 function handleKeydown(e: KeyboardEvent) {
-  if (mentionPopupVisible.value && visibleMentionPages.value.length > 0) {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      mentionSelectedIndex.value = Math.min(visibleMentionPages.value.length - 1, mentionSelectedIndex.value + 1)
-      return
-    }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      mentionSelectedIndex.value = Math.max(0, mentionSelectedIndex.value - 1)
-      return
-    }
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      const page = visibleMentionPages.value[mentionSelectedIndex.value]
-      if (page) {
-        selectMention(page)
+  if (mentionPopupVisible.value) {
+    const totalItems = activeDocOffset.value + visibleMentionPages.value.length
+    if (totalItems > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        mentionSelectedIndex.value = Math.min(totalItems - 1, mentionSelectedIndex.value + 1)
+        return
       }
-      return
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        mentionSelectedIndex.value = Math.max(0, mentionSelectedIndex.value - 1)
+        return
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        if (mentionSelectedIndex.value === 0 && showActiveDocOption.value) {
+          selectActiveDoc()
+        } else {
+          const pageIdx = mentionSelectedIndex.value - activeDocOffset.value
+          const page = visibleMentionPages.value[pageIdx]
+          if (page) {
+            selectMention(page)
+          }
+        }
+        return
+      }
     }
   }
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -117,6 +129,20 @@ function handleKeydown(e: KeyboardEvent) {
 
 function selectMention(page: WikiIndexPage) {
   switchSource(page)
+  mentionSelectedIndex.value = 0
+  inputRef.value?.focus()
+}
+
+async function selectActiveDoc() {
+  if (!props.getActiveDocumentContent) return
+  try {
+    const activeContent = await props.getActiveDocumentContent()
+    if (activeContent && activeContent.content) {
+      switchToActiveDoc(activeContent)
+    }
+  } catch {
+    // silently ignore
+  }
   mentionSelectedIndex.value = 0
   inputRef.value?.focus()
 }
@@ -387,7 +413,7 @@ async function handleAppendToWiki() {
 
     <div class="wiki-chat-dialog__input-shell">
       <div
-        v-if="mentionPopupVisible && visibleMentionPages.length > 0"
+        v-if="mentionPopupVisible && (showActiveDocOption || visibleMentionPages.length > 0)"
         class="wiki-chat-dialog__mention-popup"
       >
         <div class="wiki-chat-dialog__mention-header">
@@ -395,10 +421,19 @@ async function handleAppendToWiki() {
         </div>
         <div class="wiki-chat-dialog__mention-list">
           <div
+            v-if="showActiveDocOption"
+            class="wiki-chat-dialog__mention-item wiki-chat-dialog__mention-item--active-doc"
+            :class="{ 'wiki-chat-dialog__mention-item--active': mentionSelectedIndex === 0 }"
+            @mousedown.prevent="selectActiveDoc"
+          >
+            <svg class="wiki-chat-dialog__inline-icon" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+            <span class="wiki-chat-dialog__mention-title">{{ t('wikiChat.currentPageOption') }}</span>
+          </div>
+          <div
             v-for="(page, index) in visibleMentionPages"
             :key="page.documentId"
             class="wiki-chat-dialog__mention-item"
-            :class="{ 'wiki-chat-dialog__mention-item--active': index === mentionSelectedIndex }"
+            :class="{ 'wiki-chat-dialog__mention-item--active': (index + activeDocOffset) === mentionSelectedIndex }"
             @mousedown.prevent="selectMention(page)"
           >
             <svg class="wiki-chat-dialog__inline-icon" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
@@ -684,6 +719,11 @@ async function handleAppendToWiki() {
 }
 .wiki-chat-dialog__mention-item--active {
   background: color-mix(in srgb, var(--b3-theme-primary) 14%, var(--b3-theme-background));
+}
+.wiki-chat-dialog__mention-item--active-doc {
+  border-bottom: 1px solid color-mix(in srgb, var(--b3-border-color) 60%, transparent);
+  color: color-mix(in srgb, var(--accent-cool) 80%, var(--b3-theme-on-background));
+  font-weight: 500;
 }
 .wiki-chat-dialog__mention-title {
   min-width: 0;

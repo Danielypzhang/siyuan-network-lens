@@ -61,6 +61,7 @@ export interface WikiChatSessionController {
   syncMentionState: (cursorPos: number) => void
   sendMessage: () => Promise<void>
   switchSource: (page: WikiIndexPage) => void
+  switchToActiveDoc: (activeContent: WikiChatScope['activeContent']) => void
   resetSession: () => void
   buildSaveMarkdown: () => string
   appendChatToWiki: (params: {
@@ -125,6 +126,28 @@ export function createWikiChatSession(options: WikiChatSessionOptions): WikiChat
       sourceSwitched: true,
       switchFrom: oldTitle,
       switchTo: page.title,
+    })
+  }
+
+  function switchToActiveDoc(activeContent: WikiChatScope['activeContent']) {
+    if (!activeContent) return
+    const oldTitle = session.value.currentSourcePage?.title ?? ''
+    inputText.value = inputText.value.replace(/@[^@\s]*\s?/, '')
+    mentionPopupVisible.value = false
+    mentionFilter.value = ''
+    scope.value = {
+      mode: 'active',
+      activeContent,
+    }
+    session.value.currentSourcePage = null
+    session.value.messages.push({
+      id: nextMessageId(),
+      role: 'system',
+      content: t('llmWiki.chat.sourceSwitched', { from: oldTitle, to: activeContent.title }),
+      timestamp: Date.now(),
+      sourceSwitched: true,
+      switchFrom: oldTitle,
+      switchTo: activeContent.title,
     })
   }
 
@@ -526,6 +549,7 @@ export function createWikiChatSession(options: WikiChatSessionOptions): WikiChat
     syncMentionState,
     sendMessage,
     switchSource,
+    switchToActiveDoc,
     resetSession,
     buildSaveMarkdown,
     appendChatToWiki,

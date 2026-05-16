@@ -3161,6 +3161,10 @@ const UI_TEXT = {
       en_US: 'AI Q&A',
       zh_CN: 'AI 问答',
     },
+    currentPageOption: {
+      en_US: 'Current Page',
+      zh_CN: '当前页面',
+    },
   },
   llmWiki: {
     chat: {
