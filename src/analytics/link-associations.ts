@@ -91,6 +91,19 @@ export async function fetchKramdownOutboundDocRefs(kramdown: string): Promise<Ex
   return [...result.values()]
 }
 
+export async function resolveBlockIdsToRootDocIds(blockIds: string[]): Promise<Map<string, string>> {
+  if (blockIds.length === 0) return new Map()
+  const ids = blockIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',')
+  const rows = await sql(
+    `SELECT id AS blockId, root_id AS rootId FROM blocks WHERE id IN (${ids})`
+  ) as Array<{ blockId: string; rootId: string }>
+  const map = new Map<string, string>()
+  for (const row of rows) {
+    map.set(row.blockId, row.rootId)
+  }
+  return map
+}
+
 export function buildLinkAssociations(params: {
   documentId: string
   references: ReferenceRecord[]

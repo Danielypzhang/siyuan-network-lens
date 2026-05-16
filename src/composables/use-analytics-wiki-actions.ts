@@ -212,6 +212,52 @@ export function createAnalyticsWikiActionsController(params: {
           params.notify(t('analytics.wiki.noSourceChangesUseCache'), 3000, 'info')
           return
         }
+
+        const pageHPath = wikiContainerPath ? `${wikiContainerPath}/${pageTitle}` : `${themeDocument.hpath}/${pageTitle}`
+        const existingPage = await resolveExistingWikiPage({
+          notebook: wikiTarget?.notebook ?? themeDocument.box,
+          pageHPath,
+          storedRecord,
+          getIDsByHPath: params.getIDsByHPath,
+          getBlockKramdown: params.getBlockKramdown,
+        })
+        if (existingPage?.managedMarkdown) {
+          params.wikiPreview.value = {
+            generatedAt: new Date().toISOString(),
+            scope: {
+              summary: {
+                sourceDocumentCount: effectiveSourceDocuments.length,
+                generatedSectionCount: 0,
+                referenceCount: 0,
+                manualNotesParagraphCount: existingPage.hasManualNotes ? 1 : 0,
+              },
+              descriptionLines: scopeDescriptionLines,
+            },
+            themePages: [],
+            unclassifiedDocuments: [],
+            excludedWikiDocuments: [],
+            skippedSourceDocuments,
+            deltaStats: {
+              isIncremental: true,
+              newCount: 0,
+              changedCount: 0,
+              unchangedCount: effectiveSourceDocuments.length,
+              deletedCount: 0,
+              processingTimeMs: 0,
+            },
+            sourceDocMetas: effectiveSourceDocuments.map(doc => ({
+              documentId: doc.id,
+              title: doc.title || doc.hpath || doc.id,
+              deltaStatus: 'unchanged' as const,
+              linkType: 'outbound' as const,
+              linkTypes: ['outbound'] as WikiSourceDocLinkType[],
+              updatedAt: doc.updated,
+            })),
+            isCachedPreview: true,
+          }
+          params.notify(t('analytics.wiki.noSourceChangesUseCache'), 3000, 'info')
+          return
+        }
       }
 
       const sourceDocumentTimestamps: Record<string, string> = {}
