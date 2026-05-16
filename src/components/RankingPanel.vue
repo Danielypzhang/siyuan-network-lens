@@ -333,27 +333,32 @@ async function handleToggleLinkPanel(documentId: string) {
 
   try {
     const docIds = await fetchOutboundBlockRefDocumentIds(documentId)
+    console.log('[NetworkLens] SQL refs:', documentId, '→', docIds)
     for (const id of docIds) allIds.add(id)
-  } catch {
-    // SQL failed, continue with kramdown fallback
+  } catch (e) {
+    console.warn('[NetworkLens] SQL refs failed:', e)
   }
 
   if (props.getBlockKramdown) {
     try {
       const { kramdown } = await props.getBlockKramdown(documentId)
       const kramdownIds = extractKramdownDocumentIds(kramdown)
+      console.log('[NetworkLens] kramdown scan:', documentId, '→', kramdownIds)
       for (const id of kramdownIds) allIds.add(id)
-    } catch {
-      // kramdown failed
+    } catch (e) {
+      console.warn('[NetworkLens] kramdown failed:', e)
     }
   }
 
-  extraOutboundDocIdsMap.value = { ...extraOutboundDocIdsMap.value, [documentId]: [...allIds] }
+  const merged = [...allIds]
+  console.log('[NetworkLens] merged extraOutboundIds:', documentId, '→', merged)
+  extraOutboundDocIdsMap.value = { ...extraOutboundDocIdsMap.value, [documentId]: merged }
 }
 
 function resolveAssociations(documentId: string): LinkAssociations {
   const extraOutboundDocumentIds = extraOutboundDocIdsMap.value[documentId]
   const associations = props.resolveLinkAssociations(documentId, extraOutboundDocumentIds)
+  console.log('[NetworkLens] resolveAssociations:', documentId, 'extra:', extraOutboundDocumentIds, '→ outbound:', associations.outbound.length)
   return {
     outbound: associations.outbound ?? [],
     inbound: associations.inbound ?? [],
