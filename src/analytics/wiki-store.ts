@@ -226,7 +226,7 @@ function normalizeTimestampMap(value: unknown): Record<string, string> | undefin
     .filter(([key, val]) => typeof key === 'string' && typeof val === 'string' && val.trim())
     .map(([key, val]) => [key.trim(), (val as string).trim()])
 
-  return entries.length > 0 ? Object.fromEntries(entries) : undefined
+  return Object.fromEntries(entries)
 }
 
 function normalizeOptionalString(value: unknown): string {

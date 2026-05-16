@@ -216,12 +216,15 @@ export function createAnalyticsWikiActionsController(params: {
       console.info('[NetworkLens][Wiki] Stored record lookup:', {
         pageKey,
         hasStoredRecord: Boolean(storedRecord),
-        hasSourceDocumentTimestamps: Boolean(storedRecord?.sourceDocumentTimestamps),
+        hasSourceDocumentTimestamps: hasStoredTimestamps,
         sourceDocumentTimestampsKeys: storedRecord?.sourceDocumentTimestamps ? Object.keys(storedRecord.sourceDocumentTimestamps) : [],
         storedRecordFields: storedRecord ? Object.keys(storedRecord) : [],
       })
 
       const isIncremental = params.config.wikiIncrementalEnabled !== false
+      const hasStoredTimestamps = storedRecord?.sourceDocumentTimestamps
+        && Object.keys(storedRecord.sourceDocumentTimestamps).length > 0
+
       const deltaMap = isIncremental
         ? computeSourceDocumentDeltas(
           effectiveSourceDocuments.map(d => ({ id: d.id, updated: d.updated })),
@@ -232,7 +235,7 @@ export function createAnalyticsWikiActionsController(params: {
       const hasChanges = [...deltaMap.values()].some(s => s !== 'unchanged')
       console.info('[NetworkLens][Wiki] Incremental check:', {
         isIncremental,
-        hasStoredTimestamps: Boolean(storedRecord?.sourceDocumentTimestamps),
+        hasStoredTimestamps,
         hasChanges,
         deltaSummary: {
           new: [...deltaMap.values()].filter(s => s === 'new').length,
@@ -242,7 +245,7 @@ export function createAnalyticsWikiActionsController(params: {
         },
         sourceDocumentCount: effectiveSourceDocuments.length,
       })
-      if (isIncremental && storedRecord?.sourceDocumentTimestamps && !hasChanges) {
+      if (isIncremental && hasStoredTimestamps && !hasChanges) {
         const cached = params.wikiPreviewCache.value.get(request.themeDocumentId)
         if (cached) {
           params.wikiPreview.value = cached
@@ -317,7 +320,7 @@ export function createAnalyticsWikiActionsController(params: {
       }
       // --- End incremental diff logic ---
 
-      const isIncrementalUpdate = isIncremental && Boolean(storedRecord?.sourceDocumentTimestamps)
+      const isIncrementalUpdate = isIncremental && hasStoredTimestamps
 
       const scopedDocumentMap = new Map(scopedDocuments.map(document => [document.id, document]))
 
@@ -617,7 +620,7 @@ export function createAnalyticsWikiActionsController(params: {
       await params.aiWikiStore.savePageRecord(nextRecord)
 
       const deltaStats = {
-        isIncremental: isIncremental && Boolean(storedRecord?.sourceDocumentTimestamps),
+        isIncremental: isIncremental && hasStoredTimestamps,
         newCount: [...deltaMap.values()].filter(s => s === 'new').length,
         changedCount: [...deltaMap.values()].filter(s => s === 'changed').length,
         unchangedCount: [...deltaMap.values()].filter(s => s === 'unchanged').length,
