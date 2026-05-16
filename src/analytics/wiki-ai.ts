@@ -184,8 +184,6 @@ function buildWikiUserPayload(params: {
       sourceDocumentMap.set(doc.documentId, {
         documentId: doc.documentId,
         title: doc.title,
-        positioning: doc.positioning,
-        keywords: doc.keywords,
         deltaStatus: 'unchanged',
       })
       continue
