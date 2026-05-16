@@ -43,6 +43,7 @@ export interface WikiThemePageApplyInput {
   themeDocumentHPath: string
   sourceDocumentIds: string[]
   sourceDocumentEntries?: WikiSourceDocumentEntry[]
+  sourceDocumentTimestamps?: Record<string, string>
   preview: WikiPagePreviewResult
   draft: RenderedWikiDraft
 }
@@ -845,6 +846,7 @@ function buildThemePageRecord(params: {
       title: entry.title,
       linkTypes: [...entry.linkTypes],
     })) ?? [],
+    sourceDocumentTimestamps: params.storedRecord?.sourceDocumentTimestamps ?? params.page.sourceDocumentTimestamps ?? {},
     pageFingerprint: params.pageFingerprint,
     managedFingerprint: params.managedFingerprint,
     lastGeneratedAt: params.page.preview.lastGeneratedAt,

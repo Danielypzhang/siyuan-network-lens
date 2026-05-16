@@ -30,6 +30,7 @@ export interface WikiPreviewThemePageItem {
   themeDocumentBox: string
   themeDocumentHPath: string
   sourceDocumentIds: string[]
+  sourceDocumentTimestamps?: Record<string, string>
   preview: WikiPagePreviewResult
   diagnosis: WikiTemplateDiagnosis
   pagePlan: WikiPagePlan
