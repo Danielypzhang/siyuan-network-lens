@@ -57,7 +57,7 @@ const {
 const messagesRef = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
 const mentionSelectedIndex = ref(0)
-const MAX_VISIBLE_MENTION_ITEMS = 3
+const MAX_VISIBLE_MENTION_ITEMS = 20
 const visibleMentionPages = computed(() => filteredPages.value.slice(0, MAX_VISIBLE_MENTION_ITEMS))
 const hasMoreMentions = computed(() => filteredPages.value.length > MAX_VISIBLE_MENTION_ITEMS)
 
@@ -662,7 +662,7 @@ async function handleAppendToWiki() {
   z-index: 2;
 }
 .wiki-chat-dialog__mention-list {
-  max-height: 148px;
+  max-height: 240px;
   overflow-y: auto;
 }
 .wiki-chat-dialog__mention-header {
