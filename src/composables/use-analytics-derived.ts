@@ -134,10 +134,12 @@ export function buildLinkAssociationMap(params: {
   associationDocumentMap: Map<string, DocumentRecord>
   now: Date
   timeRange: TimeRange
+  extraOutboundRefsMap?: Record<string, Array<{ documentId: string; anchorText?: string }>>
 }): Map<string, ReturnType<typeof buildLinkAssociations>> {
   const map = new Map<string, ReturnType<typeof buildLinkAssociations>>()
 
   for (const item of params.ranking) {
+    const extraRefs = params.extraOutboundRefsMap?.[item.documentId]
     map.set(item.documentId, buildLinkAssociations({
       documentId: item.documentId,
       references: params.references,
@@ -145,6 +147,7 @@ export function buildLinkAssociationMap(params: {
       childDocumentMap: params.associationDocumentMap,
       now: params.now,
       timeRange: params.timeRange,
+      extraOutboundRefs: extraRefs,
     }))
   }
 

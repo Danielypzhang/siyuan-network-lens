@@ -41,7 +41,7 @@ import {
   countSelectedSummaryItems,
   type PathScope,
 } from './use-analytics-derived'
-import { buildLinkAssociations, type ExtractedDocRef } from '@/analytics/link-associations'
+import { buildLinkAssociations, fetchOutboundBlockRefDocRefs, fetchKramdownOutboundDocRefs, type ExtractedDocRef } from '@/analytics/link-associations'
 import {
   createAiSuggestionActions,
   createLinkAssociationInteractions,
@@ -251,6 +251,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
   const wikiProgressText = ref('')
   const wikiPreview = ref<WikiPreviewState | null>(null)
   const wikiPreviewCache = ref<Map<string, WikiPreviewState>>(new Map())
+  const outboundBlockRefsMap = ref<Record<string, ExtractedDocRef[]>>({})
   const appliedAnalysisConfig = ref(readAppliedAnalysisConfig(params.config))
   const timeRangeOptions = computed(() => buildTimeRangeOptions())
   const appliedConfig = computed(() => buildAppliedAnalysisConfig(params.config, appliedAnalysisConfig.value))
@@ -527,6 +528,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
         associationDocumentMap: associationDocumentMap.value,
         now: analysisNow.value,
         timeRange: timeRange.value,
+        extraOutboundRefsMap: outboundBlockRefsMap.value,
       })
     : new Map())
 
@@ -673,6 +675,47 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
         }).catch(() => {})
       }
     }).catch(() => {})
+  })
+
+  async function prefetchOutboundBlockRefs() {
+    const rankingItems = report.value?.ranking ?? []
+    if (rankingItems.length === 0) return
+    const nextMap: Record<string, ExtractedDocRef[]> = {}
+    for (const item of rankingItems) {
+      const merged = new Map<string, ExtractedDocRef>()
+      try {
+        const refs = await fetchOutboundBlockRefDocRefs(item.documentId)
+        for (const ref of refs) {
+          merged.set(ref.documentId, ref)
+        }
+      } catch {
+        // SQL failed
+      }
+      try {
+        const { kramdown } = await getBlockKramdown(item.documentId)
+        const kramdownRefs = await fetchKramdownOutboundDocRefs(kramdown)
+        for (const ref of kramdownRefs) {
+          const existing = merged.get(ref.documentId)
+          if (!existing) {
+            merged.set(ref.documentId, ref)
+          } else if (!existing.anchorText && ref.anchorText) {
+            existing.anchorText = ref.anchorText
+          }
+        }
+      } catch {
+        // kramdown failed
+      }
+      if (merged.size > 0) {
+        nextMap[item.documentId] = [...merged.values()]
+      }
+    }
+    outboundBlockRefsMap.value = nextMap
+  }
+
+  watch(report, (newReport) => {
+    if (!newReport) return
+    outboundBlockRefsMap.value = {}
+    prefetchOutboundBlockRefs().catch(() => {})
   })
 
   setupAnalyticsSelectionSync({
@@ -824,12 +867,44 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
   }
 
   function resolveLinkAssociations(documentId: string, extraOutboundRefs?: ExtractedDocRef[]) {
-    if (!extraOutboundRefs || extraOutboundRefs.length === 0) {
-      const cached = linkAssociationsByDocumentId.value.get(documentId)
-      if (cached) return cached
-    }
-
     if (!snapshot.value) return { outbound: [], inbound: [], childDocuments: [] }
+
+    const cached = linkAssociationsByDocumentId.value.get(documentId)
+    if (cached) {
+      if (!extraOutboundRefs || extraOutboundRefs.length === 0) return cached
+      const existingIds = new Set(cached.outbound.map(item => item.documentId))
+      const additionalRefs = extraOutboundRefs.filter(ref => !existingIds.has(ref.documentId))
+      if (additionalRefs.length === 0) return cached
+
+      const extraTitleMap = new Map<string, string>()
+      const additionalIds = new Set<string>()
+      for (const ref of additionalRefs) {
+        if (ref.documentId === documentId) continue
+        additionalIds.add(ref.documentId)
+        if (ref.anchorText) {
+          extraTitleMap.set(ref.documentId, ref.anchorText)
+        }
+      }
+
+      const additionalOutbound = [...additionalIds]
+        .map(id => {
+          const doc = sampleDocumentMap.value.get(id)
+          const title = extraTitleMap.get(id) || (doc ? (doc.title || doc.name || doc.content || doc.hpath || id) : id)
+          return {
+            documentId: id,
+            title,
+            direction: 'outbound' as const,
+            isOverlap: cached.inbound.some(item => item.documentId === id),
+          }
+        })
+        .sort((left, right) => left.title.localeCompare(right.title, 'zh-CN'))
+
+      return {
+        outbound: [...cached.outbound, ...additionalOutbound],
+        inbound: cached.inbound,
+        childDocuments: cached.childDocuments,
+      }
+    }
 
     return buildLinkAssociations({
       documentId,
