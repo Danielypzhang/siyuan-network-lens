@@ -210,6 +210,13 @@ export function createAnalyticsWikiActionsController(params: {
         themeDocumentId: themeDocument.documentId,
       })
       const storedRecord = await params.aiWikiStore.getPageRecord(pageKey)
+      console.info('[NetworkLens][Wiki] Stored record lookup:', {
+        pageKey,
+        hasStoredRecord: Boolean(storedRecord),
+        hasSourceDocumentTimestamps: Boolean(storedRecord?.sourceDocumentTimestamps),
+        sourceDocumentTimestampsKeys: storedRecord?.sourceDocumentTimestamps ? Object.keys(storedRecord.sourceDocumentTimestamps) : [],
+        storedRecordFields: storedRecord ? Object.keys(storedRecord) : [],
+      })
 
       const isIncremental = params.config.wikiIncrementalEnabled !== false
       const deltaMap = isIncremental
