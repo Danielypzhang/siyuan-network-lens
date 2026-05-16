@@ -317,15 +317,17 @@ const emit = defineEmits<{
   (e: 'addTag', documentId: string, tag?: string): void
 }>()
 
-const extraOutboundDocIdsMap = ref(new Map<string, string[]>())
+const extraOutboundDocIdsMap = ref<Record<string, string[]>>({})
 
 async function handleToggleLinkPanel(documentId: string) {
   props.toggleLinkPanel(documentId)
   if (!props.isLinkPanelExpanded(documentId)) {
-    extraOutboundDocIdsMap.value.delete(documentId)
+    const next = { ...extraOutboundDocIdsMap.value }
+    delete next[documentId]
+    extraOutboundDocIdsMap.value = next
     return
   }
-  if (extraOutboundDocIdsMap.value.has(documentId)) return
+  if (documentId in extraOutboundDocIdsMap.value) return
 
   const allIds = new Set<string>()
 
@@ -346,11 +348,11 @@ async function handleToggleLinkPanel(documentId: string) {
     }
   }
 
-  extraOutboundDocIdsMap.value.set(documentId, [...allIds])
+  extraOutboundDocIdsMap.value = { ...extraOutboundDocIdsMap.value, [documentId]: [...allIds] }
 }
 
 function resolveAssociations(documentId: string): LinkAssociations {
-  const extraOutboundDocumentIds = extraOutboundDocIdsMap.value.get(documentId)
+  const extraOutboundDocumentIds = extraOutboundDocIdsMap.value[documentId]
   const associations = props.resolveLinkAssociations(documentId, extraOutboundDocumentIds)
   return {
     outbound: associations.outbound ?? [],
