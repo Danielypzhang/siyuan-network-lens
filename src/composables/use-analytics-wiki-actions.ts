@@ -363,14 +363,11 @@ export function createAnalyticsWikiActionsController(params: {
         const cycleStart = cycleIndex * docsPerCycle
         const cycleDocIds = sortedChangedIds.slice(cycleStart, cycleStart + docsPerCycle)
         const cycleDocIdSet = new Set(cycleDocIds)
-        for (const id of cycleDocIds) {
-          processedDocIds.add(id)
-        }
 
         params.wikiProgressText.value = t('wikiMaintain.progressText', {
           cycle: cycleIndex + 1,
           totalCycles: actualCycles,
-          docIndex: processedDocIds.size,
+          docIndex: processedDocIds.size + 1,
           totalDocs: sortedChangedIds.length,
         })
 
@@ -438,7 +435,7 @@ export function createAnalyticsWikiActionsController(params: {
             params.wikiProgressText.value = t('wikiMaintain.progressText', {
               cycle: cycleIndex + 1,
               totalCycles: actualCycles,
-              docIndex: processedDocIds.size,
+              docIndex: processedDocIds.size + 1,
               totalDocs: sortedChangedIds.length,
             })
 
@@ -480,6 +477,17 @@ export function createAnalyticsWikiActionsController(params: {
             })
 
             currentWikiContent = batchDraft.managedMarkdown
+
+            for (const id of batches[batchIndex]) {
+              processedDocIds.add(id)
+            }
+
+            params.wikiProgressText.value = t('wikiMaintain.progressText', {
+              cycle: cycleIndex + 1,
+              totalCycles: actualCycles,
+              docIndex: processedDocIds.size,
+              totalDocs: sortedChangedIds.length,
+            })
           }
 
           finalDiagnosis = batchDiagnosis!
@@ -525,6 +533,17 @@ export function createAnalyticsWikiActionsController(params: {
 
           currentWikiContent = cycleDraft.managedMarkdown
         }
+
+        for (const id of cycleDocIds) {
+          processedDocIds.add(id)
+        }
+
+        params.wikiProgressText.value = t('wikiMaintain.progressText', {
+          cycle: cycleIndex + 1,
+          totalCycles: actualCycles,
+          docIndex: processedDocIds.size,
+          totalDocs: sortedChangedIds.length,
+        })
       }
 
       const sourceDocumentTimestamps: Record<string, string> = {}
@@ -724,6 +743,7 @@ export function createAnalyticsWikiActionsController(params: {
       params.notify(message, 5000, 'error')
     } finally {
       params.wikiPreviewLoading.value = false
+      params.wikiProgressText.value = ''
     }
   }
 
