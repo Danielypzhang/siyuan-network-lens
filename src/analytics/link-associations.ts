@@ -77,9 +77,7 @@ export function buildLinkAssociations(params: {
   if (params.extraOutboundDocumentIds) {
     for (const targetId of params.extraOutboundDocumentIds) {
       if (targetId === params.documentId) continue
-      if (params.documentMap.has(targetId)) {
-        outboundTargets.add(targetId)
-      }
+      outboundTargets.add(targetId)
     }
   }
 
@@ -90,6 +88,7 @@ export function buildLinkAssociations(params: {
     documentMap: params.documentMap,
     overlap,
     direction: 'outbound',
+    includeMissing: true,
   })
   const inbound = buildAssociationList({
     documentIds: inboundSources,
@@ -111,11 +110,20 @@ function buildAssociationList(params: {
   documentMap: Map<string, DocumentRecord>
   overlap: Set<string>
   direction: LinkAssociationItem['direction']
+  includeMissing?: boolean
 }): LinkAssociationItem[] {
   return [...params.documentIds]
     .map((documentId) => {
       const document = params.documentMap.get(documentId)
       if (!document) {
+        if (params.includeMissing) {
+          return {
+            documentId,
+            title: documentId,
+            direction: params.direction,
+            isOverlap: params.overlap.has(documentId),
+          }
+        }
         return null
       }
       return {
