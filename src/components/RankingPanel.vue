@@ -288,7 +288,7 @@
             {{ t('rankingPanel.themePromptDialogClear') }}
           </button>
           <button class="ghost-button" type="button" @click="closeThemePromptDialog">
-            {{ t('wikiMaintain.maintain.cancel') }}
+            {{ t('llmWiki.maintain.cancel') }}
           </button>
         </div>
       </div>
@@ -320,7 +320,7 @@ const props = withDefaults(defineProps<{
   openDocument: (documentId: string) => void
   toggleLinkPanel: (documentId: string) => void
   isLinkPanelExpanded: (documentId: string) => boolean
-  resolveLinkAssociations: (documentId: string) => LinkAssociations
+  resolveLinkAssociations: (documentId: string, extraOutboundRefs?: ExtractedDocRef[]) => LinkAssociations
   toggleLinkGroup: (documentId: string, direction: LinkDirection) => void
   isLinkGroupExpanded: (documentId: string, direction: LinkDirection) => boolean
   isSyncing: (coreDocumentId: string, targetDocumentId: string, direction: LinkDirection) => boolean
