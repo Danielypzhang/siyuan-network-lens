@@ -1,6 +1,6 @@
 import { ref, type ComputedRef } from 'vue'
 
-import { fetchOutboundBlockRefDocRefs, fetchKramdownOutboundDocRefs, resolveBlockIdsToRootDocIds } from '@/analytics/link-associations'
+import { fetchOutboundBlockRefDocRefs, fetchKramdownOutboundDocRefs } from '@/analytics/link-associations'
 import { buildSiyuanBlockLinkMarkdown } from '@/analytics/link-sync'
 import { normalizeWikiSourceDocLinkTypes, type WikiSourceDocLinkType } from '@/analytics/wiki-source-docs'
 import { t } from '@/i18n/ui'
@@ -68,13 +68,15 @@ export function createAppWikiPanelController(params: {
     }
 
     const knownDocIds = new Set(sourceDocumentIds)
-    const blockRefIds: string[] = []
 
     try {
       const blockRefDocs = await fetchOutboundBlockRefDocRefs(documentId)
       for (const ref of blockRefDocs) {
-        if (knownDocIds.has(ref.documentId)) continue
-        blockRefIds.push(ref.documentId)
+        if (!knownDocIds.has(ref.documentId)) {
+          knownDocIds.add(ref.documentId)
+          sourceDocumentIds.push(ref.documentId)
+          pushLinkType(sourceDocumentLinkTypes, ref.documentId, 'outbound')
+        }
       }
     } catch {
       // SQL failed, continue with kramdown fallback
@@ -85,34 +87,14 @@ export function createAppWikiPanelController(params: {
         const { kramdown } = await params.getBlockKramdown(documentId)
         const kramdownRefs = await fetchKramdownOutboundDocRefs(kramdown)
         for (const ref of kramdownRefs) {
-          if (knownDocIds.has(ref.documentId) || blockRefIds.includes(ref.documentId)) continue
-          blockRefIds.push(ref.documentId)
+          if (!knownDocIds.has(ref.documentId)) {
+            knownDocIds.add(ref.documentId)
+            sourceDocumentIds.push(ref.documentId)
+            pushLinkType(sourceDocumentLinkTypes, ref.documentId, 'outbound')
+          }
         }
       } catch {
         // kramdown failed
-      }
-    }
-
-    if (blockRefIds.length > 0) {
-      try {
-        const blockToRootMap = await resolveBlockIdsToRootDocIds(blockRefIds)
-        for (const blockId of blockRefIds) {
-          const rootDocId = blockToRootMap.get(blockId)
-          if (rootDocId && rootDocId !== documentId && !knownDocIds.has(rootDocId)) {
-            knownDocIds.add(rootDocId)
-            sourceDocumentIds.push(rootDocId)
-            pushLinkType(sourceDocumentLinkTypes, rootDocId, 'outbound')
-          }
-        }
-      } catch {
-        // resolveBlockIdsToRootDocIds failed, add block IDs as-is
-        for (const blockId of blockRefIds) {
-          if (blockId !== documentId && !knownDocIds.has(blockId)) {
-            knownDocIds.add(blockId)
-            sourceDocumentIds.push(blockId)
-            pushLinkType(sourceDocumentLinkTypes, blockId, 'outbound')
-          }
-        }
       }
     }
 

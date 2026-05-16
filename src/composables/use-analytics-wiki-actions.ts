@@ -9,6 +9,7 @@ import type {
 } from '@/analytics/analysis'
 import type { AiDocumentIndexStore, DocumentIndexProfile } from '@/analytics/ai-index-store'
 import type { AiWikiService } from '@/analytics/wiki-ai'
+import { fetchBlockDocumentRecords } from '@/analytics/link-associations'
 import { buildWikiPreview } from '@/analytics/wiki-diff'
 import { applyWikiDocuments } from '@/analytics/wiki-documents'
 import { resolveScopedPathTarget } from '@/analytics/document-paths'
@@ -144,10 +145,23 @@ export function createAnalyticsWikiActionsController(params: {
         throw new Error(t('analytics.controller.wikiThemeDocumentNotFound'))
       }
 
+      const associationMap = new Map(params.associationDocumentMap.value)
+      const missingIds = (request.sourceDocumentIds ?? []).filter(id => !associationMap.has(id))
+      if (missingIds.length > 0) {
+        try {
+          const blockRecords = await fetchBlockDocumentRecords(missingIds)
+          for (const [id, record] of blockRecords) {
+            associationMap.set(id, record)
+          }
+        } catch {
+          // block lookup failed, continue without them
+        }
+      }
+
       const scopedDocuments = resolveWikiScopeDocuments({
         sourceDocumentIds: request.sourceDocumentIds,
         fallbackDocuments: params.filteredDocuments.value,
-        associationDocumentMap: params.associationDocumentMap.value,
+        associationDocumentMap: associationMap,
       })
       const sourceDocuments = scopedDocuments.filter(document => document.id !== themeDocument.documentId)
       const scopeDescriptionLines = buildWikiScopeDescriptionLines({
