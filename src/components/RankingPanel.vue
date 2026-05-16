@@ -284,6 +284,7 @@ const props = withDefaults(defineProps<{
     previewLoading: boolean
     applyLoading: boolean
     error: string
+    progressText: string
     preview: WikiPreviewState | null
     prepareWikiPreview: () => void | Promise<void>
     applyWikiChanges: (overwriteConflicts?: boolean) => void | Promise<void>

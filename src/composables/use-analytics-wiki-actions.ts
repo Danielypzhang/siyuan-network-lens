@@ -75,6 +75,7 @@ export function createAnalyticsWikiActionsController(params: {
   wikiPreviewLoading: Ref<boolean>
   wikiApplyLoading: Ref<boolean>
   wikiError: Ref<string>
+  wikiProgressText: Ref<string>
   wikiPreview: Ref<WikiPreviewState | null>
   wikiPreviewCache: Ref<Map<string, WikiPreviewState>>
   wikiPreviewCacheStore?: WikiPreviewCacheStore | null
@@ -119,6 +120,7 @@ export function createAnalyticsWikiActionsController(params: {
   async function prepareWikiPreview(request?: WikiPreviewRequest) {
     params.wikiPreviewLoading.value = true
     params.wikiError.value = ''
+    params.wikiProgressText.value = t('wikiMaintain.generating')
 
     try {
       if (!params.config.wikiEnabled) {
@@ -362,6 +364,13 @@ export function createAnalyticsWikiActionsController(params: {
           processedDocIds.add(id)
         }
 
+        params.wikiProgressText.value = t('wikiMaintain.progressText', {
+          cycle: cycleIndex + 1,
+          totalCycles: actualCycles,
+          docIndex: processedDocIds.size,
+          totalDocs: sortedChangedIds.length,
+        })
+
         const cycleDeltaMap = new Map(
           [...deltaMap.entries()].map(([id, status]) => {
             if (cycleDocIdSet.has(id)) return [id, status] as const
@@ -422,6 +431,13 @@ export function createAnalyticsWikiActionsController(params: {
             })
 
             console.info('[NetworkLens][Wiki] Cycle', cycleIndex + 1, 'Batch', batchIndex + 1, '/', batches.length)
+
+            params.wikiProgressText.value = t('wikiMaintain.progressText', {
+              cycle: cycleIndex + 1,
+              totalCycles: actualCycles,
+              docIndex: processedDocIds.size,
+              totalDocs: sortedChangedIds.length,
+            })
 
             batchDiagnosis = await params.aiWikiService.diagnoseThemeTemplate({
               config: params.appliedConfig.value,
@@ -793,6 +809,7 @@ export function createAnalyticsWikiActionsController(params: {
     wikiPreviewLoading: params.wikiPreviewLoading,
     wikiApplyLoading: params.wikiApplyLoading,
     wikiError: params.wikiError,
+    wikiProgressText: params.wikiProgressText,
     wikiPreview: params.wikiPreview,
     restoreCachedWikiPreview,
     prepareWikiPreview,

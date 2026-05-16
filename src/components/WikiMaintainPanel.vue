@@ -12,7 +12,7 @@
           @click="prepareWikiPreview"
         >
           <span v-if="previewLoading" class="spinner" aria-hidden="true" />
-          {{ previewLoading ? t('wikiMaintain.generating') : t('wikiMaintain.generatePreview') }}
+          {{ previewLoading ? progressText : t('wikiMaintain.generatePreview') }}
         </button>
         <button
           class="ghost-button"
@@ -340,6 +340,7 @@ const props = defineProps<{
   previewLoading: boolean
   applyLoading: boolean
   error: string
+  progressText: string
   preview: WikiPreviewState | null
   prepareWikiPreview: () => void | Promise<void>
   applyWikiChanges: (overwriteConflicts?: boolean) => void | Promise<void>

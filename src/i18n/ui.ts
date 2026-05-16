@@ -1313,6 +1313,10 @@ const UI_TEXT = {
       en_US: 'Generating...',
       zh_CN: '生成中...',
     },
+    progressText: {
+      en_US: 'Processing {cycle}/{totalCycles} (doc {docIndex}/{totalDocs})...',
+      zh_CN: '处理 {cycle}/{totalCycles} (文档 {docIndex}/{totalDocs})...',
+    },
     generatePreview: {
       en_US: 'Generate preview',
       zh_CN: '生成预览',

@@ -246,6 +246,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
   const wikiPreviewLoading = ref(false)
   const wikiApplyLoading = ref(false)
   const wikiError = ref('')
+  const wikiProgressText = ref('')
   const wikiPreview = ref<WikiPreviewState | null>(null)
   const wikiPreviewCache = ref<Map<string, WikiPreviewState>>(new Map())
   const appliedAnalysisConfig = ref(readAppliedAnalysisConfig(params.config))
@@ -598,6 +599,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
     wikiPreviewLoading,
     wikiApplyLoading,
     wikiError,
+    wikiProgressText,
     wikiPreview,
     wikiPreviewCache,
     wikiPreviewCacheStore,
@@ -622,6 +624,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
     restoreCachedWikiPreview,
     prepareWikiPreview,
     applyWikiChanges,
+    wikiProgressText: wikiProgressTextRef,
   } = wikiActions
   const documentIndexController = createAnalyticsDocumentIndexController({
     documentMap,
@@ -1005,6 +1008,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
     wikiPreviewLoading,
     wikiApplyLoading,
     wikiError,
+    wikiProgressText,
     wikiPreview,
     filters,
     notebookOptions,

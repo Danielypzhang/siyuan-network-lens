@@ -444,7 +444,13 @@ async function requestChatCompletion(params: {
 
   try {
     return JSON.parse(response.body)
-  } catch {
+  } catch (parseError) {
+    console.error('[NetworkLens][Wiki] Failed to parse AI response as JSON:', {
+      status: response?.status,
+      bodyLength: response?.body?.length ?? 0,
+      bodyPreview: response?.body?.slice?.(0, 200) ?? '',
+      error: parseError instanceof Error ? parseError.message : String(parseError),
+    })
     throw new Error(t('analytics.wiki.aiReturnedUnparseableJson'))
   }
 }
@@ -456,11 +462,27 @@ function parseJsonFromContent(payload: any) {
 
   try {
     return JSON.parse(candidate)
-  } catch {
+  } catch (firstError) {
     const startIndex = candidate.indexOf('{')
     const endIndex = candidate.lastIndexOf('}')
     if (startIndex >= 0 && endIndex > startIndex) {
-      return JSON.parse(candidate.slice(startIndex, endIndex + 1))
+      try {
+        return JSON.parse(candidate.slice(startIndex, endIndex + 1))
+      } catch (secondError) {
+        console.error('[NetworkLens][Wiki] Failed to parse AI content JSON after extraction:', {
+          candidateLength: candidate.length,
+          candidatePreview: candidate.slice(0, 300),
+          extractedRange: `${startIndex}-${endIndex}`,
+          firstError: firstError instanceof Error ? firstError.message : String(firstError),
+          secondError: secondError instanceof Error ? secondError.message : String(secondError),
+        })
+      }
+    } else {
+      console.error('[NetworkLens][Wiki] AI returned content with no JSON object:', {
+        candidateLength: candidate.length,
+        candidatePreview: candidate.slice(0, 300),
+        error: firstError instanceof Error ? firstError.message : String(firstError),
+      })
     }
     throw new Error(t('analytics.wiki.aiReturnedInvalidJson'))
   }
