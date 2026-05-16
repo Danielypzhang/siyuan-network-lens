@@ -151,28 +151,44 @@ function buildWikiUserPayload(params: {
 
   const hasExistingWiki = Boolean(existingWikiContent)
 
-  let sourceDocChars = 0
-  const sourceDocuments = payload.sourceDocuments.map(doc => {
+  const prioritizedDocs = payload.sourceDocuments.map(doc => {
     const deltaStatus = (doc as any).deltaStatus as string | undefined
     const isUnchanged = isIncremental && hasExistingWiki && deltaStatus === 'unchanged'
     const isDeleted = deltaStatus === 'deleted'
 
     if (isDeleted) {
-      return {
+      return { doc, priority: 3, deltaStatus, isUnchanged: false, isDeleted: true }
+    }
+    if (isUnchanged) {
+      return { doc, priority: 2, deltaStatus, isUnchanged: true, isDeleted: false }
+    }
+    return { doc, priority: 1, deltaStatus: deltaStatus || 'new', isUnchanged: false, isDeleted: false }
+  })
+
+  prioritizedDocs.sort((a, b) => a.priority - b.priority)
+
+  let sourceDocChars = 0
+  const sourceDocumentMap = new Map<string, any>()
+
+  for (const { doc, priority, deltaStatus, isUnchanged, isDeleted } of prioritizedDocs) {
+    if (isDeleted) {
+      sourceDocumentMap.set(doc.documentId, {
         documentId: doc.documentId,
         title: doc.title,
         deltaStatus: 'deleted',
-      }
+      })
+      continue
     }
 
     if (isUnchanged) {
-      return {
+      sourceDocumentMap.set(doc.documentId, {
         documentId: doc.documentId,
         title: doc.title,
         positioning: doc.positioning,
         keywords: doc.keywords,
         deltaStatus: 'unchanged',
-      }
+      })
+      continue
     }
 
     const base: any = {
@@ -206,8 +222,10 @@ function buildWikiUserPayload(params: {
         }
       }
     }
-    return base
-  })
+    sourceDocumentMap.set(doc.documentId, base)
+  }
+
+  const sourceDocuments = payload.sourceDocuments.map(doc => sourceDocumentMap.get(doc.documentId))
 
   const bundleForAi: any = {
     themeName: payload.themeName,
