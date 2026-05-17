@@ -552,6 +552,8 @@
           :on-toggle-item-collapse="toggleItemCollapse"
           :on-save-theme-prompt="onSaveThemePrompt"
           :on-get-theme-prompt="onGetThemePrompt"
+          :on-save-template-type="onSaveTemplateType"
+          :on-get-template-type="onGetTemplateType"
           :wiki-template-prompts="wikiTemplatePrompts"
           @update:incremental-enabled="(v: boolean) => emit('update:incrementalEnabled', v)"
           @toggle-theme-link="(docId: string, themeId: string) => emit('toggleThemeLink', docId, themeId)"
@@ -889,6 +891,8 @@ const props = withDefaults(defineProps<{
   batchDeleteDocIndex?: (documentIds: string[]) => Promise<number>
   onSaveThemePrompt?: (documentId: string, prompt: string | undefined) => Promise<void>
   onGetThemePrompt?: (documentId: string) => Promise<string | undefined>
+  onSaveTemplateType?: (documentId: string, templateType: string | undefined) => Promise<void>
+  onGetTemplateType?: (documentId: string) => Promise<string | undefined>
   wikiTemplatePrompts?: Record<string, string>
 }>(), {
   showWikiPanelActions: true,

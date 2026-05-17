@@ -15,6 +15,7 @@ import { applyWikiDocuments } from '@/analytics/wiki-documents'
 import { resolveScopedPathTarget } from '@/analytics/document-paths'
 import type { WikiThemeBundle } from '@/analytics/wiki-generation'
 import type { WikiTemplateDiagnosis, WikiPagePlan, WikiSectionDraft } from '@/analytics/wiki-template-model'
+import { buildManualTemplateDiagnosis } from '@/analytics/wiki-template-model'
 import { buildThemeWikiPageTitle } from '@/analytics/wiki-page-model'
 import { renderThemeWikiDraft } from '@/analytics/wiki-renderer'
 import { buildWikiPageStorageKey, type AiWikiStore, type WikiPageSnapshotRecord } from '@/analytics/wiki-store'
@@ -214,6 +215,7 @@ export function createAnalyticsWikiActionsController(params: {
       })
       const storedRecord = await params.aiWikiStore.getPageRecord(pageKey)
       const themePrompt = storedRecord?.themePrompt
+      const manualTemplateType = storedRecord?.templateType || 'tech_topic'
       const isIncremental = params.config.wikiIncrementalEnabled !== false
       const hasStoredTimestamps = storedRecord?.sourceDocumentTimestamps
         && Object.keys(storedRecord.sourceDocumentTimestamps).length > 0
@@ -440,13 +442,7 @@ export function createAnalyticsWikiActionsController(params: {
               totalDocs: sortedChangedIds.length,
             })
 
-            batchDiagnosis = await params.aiWikiService.diagnoseThemeTemplate({
-              config: params.appliedConfig.value,
-              payload: batchPayload,
-              existingWikiContent: currentWikiContent,
-              isIncremental: isIncrementalUpdate || cycleIndex > 0 || batchIndex > 0,
-              themePrompt,
-            })
+            batchDiagnosis = buildManualTemplateDiagnosis(manualTemplateType)
             batchPagePlan = await params.aiWikiService.planThemePage({
               config: params.appliedConfig.value,
               payload: batchPayload,
@@ -500,13 +496,7 @@ export function createAnalyticsWikiActionsController(params: {
           finalPagePlan = batchPagePlan!
           finalSections = batchSections
         } else {
-          finalDiagnosis = await params.aiWikiService.diagnoseThemeTemplate({
-            config: params.appliedConfig.value,
-            payload: cyclePayload,
-            existingWikiContent: currentWikiContent,
-            isIncremental: isIncrementalUpdate || cycleIndex > 0,
-            themePrompt,
-          })
+          finalDiagnosis = buildManualTemplateDiagnosis(manualTemplateType)
           finalPagePlan = await params.aiWikiService.planThemePage({
             config: params.appliedConfig.value,
             payload: cyclePayload,
@@ -638,6 +628,7 @@ export function createAnalyticsWikiActionsController(params: {
         pageFingerprint: preview.pageFingerprint,
         managedFingerprint: preview.managedFingerprint,
         lastGeneratedAt: generatedAt,
+        templateType: manualTemplateType,
         lastPreview: {
           generatedAt,
           status: preview.status,

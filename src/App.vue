@@ -240,6 +240,8 @@
         :batch-delete-doc-index="batchDeleteDocIndex"
         :on-save-theme-prompt="handleSaveThemePrompt"
         :on-get-theme-prompt="handleGetThemePrompt"
+        :on-save-template-type="handleSaveTemplateType"
+        :on-get-template-type="handleGetTemplateType"
         :wiki-template-prompts="props.config.wikiTemplatePrompts"
         @update:incremental-enabled="handleIncrementalEnabledChange"
         @toggle-theme-link="handleToggleThemeLink"
@@ -524,6 +526,23 @@ async function handleGetThemePrompt(documentId: string): Promise<string | undefi
   const pageKey = `theme:${documentId}`
   const record = await aiWikiStore.getPageRecord(pageKey)
   return record?.themePrompt
+}
+
+async function handleSaveTemplateType(documentId: string, templateType: string | undefined) {
+  if (!aiWikiStore) return
+  const pageKey = `theme:${documentId}`
+  const record = await aiWikiStore.getPageRecord(pageKey)
+  if (record) {
+    record.templateType = templateType
+    await aiWikiStore.savePageRecord(record)
+  }
+}
+
+async function handleGetTemplateType(documentId: string): Promise<string | undefined> {
+  if (!aiWikiStore) return undefined
+  const pageKey = `theme:${documentId}`
+  const record = await aiWikiStore.getPageRecord(pageKey)
+  return record?.templateType
 }
 
 async function handleLlmWikiMaintain(page: WikiIndexPage) {

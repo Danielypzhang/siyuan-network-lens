@@ -19,6 +19,7 @@ export interface WikiIndexPage {
   documentId: DocumentId
   title: string
   themeDocumentTitle?: string
+  templateType?: string
   summary?: string
   maintenanceState?: WikiMaintenanceState
   inboundReferences?: number

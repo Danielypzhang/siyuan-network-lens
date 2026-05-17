@@ -3165,6 +3165,26 @@ const UI_TEXT = {
       en_US: 'Current Page',
       zh_CN: '当前页面',
     },
+    templateAuto: {
+      en_US: 'Auto',
+      zh_CN: '自动',
+    },
+    templateTechTopic: {
+      en_US: 'Tech Topic',
+      zh_CN: '技术主题',
+    },
+    templateProductHowto: {
+      en_US: 'Product How-to',
+      zh_CN: '产品操作指南',
+    },
+    templateSocialTopic: {
+      en_US: 'Social Topic',
+      zh_CN: '社会话题',
+    },
+    templateMediaList: {
+      en_US: 'Media List',
+      zh_CN: '媒体清单',
+    },
   },
   llmWiki: {
     chat: {

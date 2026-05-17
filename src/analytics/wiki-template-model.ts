@@ -41,6 +41,20 @@ export const WIKI_TEMPLATE_DEFAULT_SECTIONS: Record<WikiTemplateType, WikiSectio
   media_list: ['intro', 'representative_works', 'comparison', 'reading_order', 'sources'],
 }
 
+export function buildManualTemplateDiagnosis(templateType: WikiTemplateType): WikiTemplateDiagnosis {
+  const enabledModules = WIKI_TEMPLATE_DEFAULT_SECTIONS[templateType]
+  const allOptional = WIKI_OPTIONAL_SECTION_TYPES as readonly string[]
+  const suppressedModules = allOptional.filter(m => !enabledModules.includes(m as WikiSectionType)) as WikiSectionType[]
+  return {
+    templateType,
+    confidence: 'high',
+    reason: `Manually specified template type: ${templateType}`,
+    enabledModules,
+    suppressedModules,
+    evidenceSummary: `User selected ${templateType} template`,
+  }
+}
+
 export type WikiSectionFormat = 'overview' | 'structured' | 'qa' | 'debate' | 'catalog'
 
 export type WikiTemplateConfidence = 'high' | 'medium' | 'low'

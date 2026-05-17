@@ -234,6 +234,21 @@
                 >
                   {{ isWikiPanelVisibleForCoreDocument(item.documentId) ? t('rankingPanel.hideWiki') : t('rankingPanel.maintainWiki') }}
                 </button>
+                <select
+                  v-if="$props.onSaveTemplateType"
+                  class="ranking-item__template-select"
+                  :value="templateTypeMap[item.documentId] || 'tech_topic'"
+                  @focus="loadTemplateType(item.documentId)"
+                  @change="handleTemplateTypeChange(item.documentId, $event)"
+                >
+                  <option
+                    v-for="opt in TEMPLATE_TYPE_OPTIONS"
+                    :key="opt.value"
+                    :value="opt.value"
+                  >
+                    {{ t(opt.labelKey) }}
+                  </option>
+                </select>
                 <button
                   v-if="$props.onSaveThemePrompt"
                   class="ghost-button ghost-button--filled ranking-item__edit-prompt-btn"
@@ -356,6 +371,8 @@ const props = withDefaults(defineProps<{
   onSaveThemePrompt?: (documentId: string, prompt: string | undefined) => Promise<void>
   onGetThemePrompt?: (documentId: string) => Promise<string | undefined>
   wikiTemplatePrompts?: Record<string, string>
+  onSaveTemplateType?: (documentId: string, templateType: string | undefined) => Promise<void>
+  onGetTemplateType?: (documentId: string) => Promise<string | undefined>
 }>(), {
   showWikiPanelActions: true,
   variant: 'panel',
@@ -377,6 +394,31 @@ const themePromptDialogDocumentId = ref('')
 const themePromptDialogDocumentTitle = ref('')
 const themePromptEditText = ref('')
 const themePromptReferenceText = ref('')
+
+const TEMPLATE_TYPE_OPTIONS = [
+  { value: 'tech_topic', labelKey: 'wikiChat.templateTechTopic' },
+  { value: 'product_howto', labelKey: 'wikiChat.templateProductHowto' },
+  { value: 'social_topic', labelKey: 'wikiChat.templateSocialTopic' },
+  { value: 'media_list', labelKey: 'wikiChat.templateMediaList' },
+] as const
+
+const templateTypeMap = ref<Record<string, string>>({})
+
+async function loadTemplateType(documentId: string) {
+  if (!props.onGetTemplateType) return
+  if (documentId in templateTypeMap.value) return
+  const result = await props.onGetTemplateType(documentId)
+  templateTypeMap.value = { ...templateTypeMap.value, [documentId]: result || 'tech_topic' }
+}
+
+async function handleTemplateTypeChange(documentId: string, event: Event) {
+  const select = event.target as HTMLSelectElement
+  const value = select.value || 'tech_topic'
+  if (props.onSaveTemplateType) {
+    await props.onSaveTemplateType(documentId, value)
+  }
+  templateTypeMap.value = { ...templateTypeMap.value, [documentId]: value }
+}
 
 async function openThemePromptDialog(documentId: string) {
   const item = props.ranking.find(r => r.documentId === documentId)
@@ -682,6 +724,27 @@ function resolveAssociations(documentId: string): LinkAssociations {
   width: 16px;
   height: 16px;
   display: block;
+}
+
+.ranking-item__template-select {
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--b3-theme-primary) 9%, var(--surface-card));
+  color: var(--b3-theme-on-background);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.ranking-item__template-select:hover {
+  border-color: color-mix(in srgb, var(--b3-theme-primary) 30%, transparent);
+}
+
+.ranking-item__template-select:focus {
+  border-color: var(--b3-theme-primary);
 }
 
 .theme-prompt-overlay {
