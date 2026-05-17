@@ -140,20 +140,22 @@ function buildWikiSystemPrompt(config: AiConfig, themePrompt?: string, templateT
 }
 
 function resolveThemePrompt(config: AiConfig, themePrompt?: string, templateType?: string): string | undefined {
+  const parts: string[] = []
   if (themePrompt?.trim()) {
-    return themePrompt.trim()
+    parts.push(themePrompt.trim())
   }
   if (templateType) {
     const userOverride = config.wikiTemplatePrompts?.[templateType]?.trim()
     if (userOverride) {
-      return userOverride
-    }
-    const builtIn = DEFAULT_WIKI_TEMPLATE_PROMPTS[templateType]?.trim()
-    if (builtIn) {
-      return builtIn
+      parts.push(userOverride)
+    } else {
+      const builtIn = DEFAULT_WIKI_TEMPLATE_PROMPTS[templateType]?.trim()
+      if (builtIn) {
+        parts.push(builtIn)
+      }
     }
   }
-  return undefined
+  return parts.length > 0 ? parts.join('\n\n') : undefined
 }
 
 function buildWikiUserPayload(params: {
