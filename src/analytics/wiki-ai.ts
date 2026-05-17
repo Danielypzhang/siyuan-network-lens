@@ -347,6 +347,10 @@ export function createAiWikiService(deps: {
         'The JSON must include templateType, confidence, coreSections, optionalSections, sectionOrder, sectionGoals, and sectionFormats.',
       ].join(' ')
 
+      const enabledModulesHint = params.diagnosis.enabledModules.length > 0
+        ? `\nMandatory sections for this template: ${params.diagnosis.enabledModules.join(', ')}. The sectionOrder MUST include ALL of these sections. Do NOT omit any of them.`
+        : ''
+
       const response = await requestChatCompletion({
         config: params.config,
         forwardProxy: deps.forwardProxy,
@@ -359,6 +363,7 @@ export function createAiWikiService(deps: {
             role: 'user',
             content: [
               t('analytics.wiki.planThemePagePrompt', { theme: params.payload.themeName }),
+              enabledModulesHint,
               t('analytics.wiki.planThemePageSchemaPrompt'),
               t('analytics.wiki.conservativeFallbackPrompt'),
               '',
@@ -722,33 +727,27 @@ function normalizePlannedSectionOrder(
   const allowedSet = new Set(params.allowedSections)
   const filteredRequested = uniqueSectionTypes(requestedOrder.filter(sectionType => allowedSet.has(sectionType)))
 
-  let resolved: WikiSectionType[]
   if (filteredRequested.length > 0) {
-    resolved = resolveSectionOrder({
+    const resolved = resolveSectionOrder({
       templateType: params.templateType,
       aiSectionOrder: filteredRequested,
-    }).filter(sectionType => allowedSet.has(sectionType))
-  } else {
-    resolved = resolveSectionOrder({
-      templateType: params.templateType,
-    }).filter(sectionType => allowedSet.has(sectionType))
-  }
-
-  const resultSet = new Set(resolved)
-  for (const sectionType of params.allowedSections) {
-    if (!resultSet.has(sectionType)) {
-      resolved.push(sectionType)
-      resultSet.add(sectionType)
+    })
+    const result = resolved.filter(sectionType => allowedSet.has(sectionType))
+    const resultSet = new Set(result)
+    if (allowedSet.has('intro') && !resultSet.has('intro')) {
+      result.unshift('intro')
     }
-  }
-  if (allowedSet.has('intro') && !resultSet.has('intro')) {
-    resolved.unshift('intro')
-  }
-  if (allowedSet.has('sources') && !resultSet.has('sources')) {
-    resolved.push('sources')
+    if (allowedSet.has('sources') && !resultSet.has('sources')) {
+      result.push('sources')
+    }
+    return result
   }
 
-  return uniqueSectionTypes(resolved)
+  const fallbackOrder = resolveSectionOrder({
+    templateType: params.templateType,
+  }).filter(sectionType => allowedSet.has(sectionType))
+
+  return uniqueSectionTypes(fallbackOrder)
 }
 
 function normalizeString(value: unknown, fallback: string): string {
