@@ -722,27 +722,33 @@ function normalizePlannedSectionOrder(
   const allowedSet = new Set(params.allowedSections)
   const filteredRequested = uniqueSectionTypes(requestedOrder.filter(sectionType => allowedSet.has(sectionType)))
 
+  let resolved: WikiSectionType[]
   if (filteredRequested.length > 0) {
-    const resolved = resolveSectionOrder({
+    resolved = resolveSectionOrder({
       templateType: params.templateType,
       aiSectionOrder: filteredRequested,
-    })
-    const result = resolved.filter(sectionType => allowedSet.has(sectionType))
-    const resultSet = new Set(result)
-    if (allowedSet.has('intro') && !resultSet.has('intro')) {
-      result.unshift('intro')
-    }
-    if (allowedSet.has('sources') && !resultSet.has('sources')) {
-      result.push('sources')
-    }
-    return result
+    }).filter(sectionType => allowedSet.has(sectionType))
+  } else {
+    resolved = resolveSectionOrder({
+      templateType: params.templateType,
+    }).filter(sectionType => allowedSet.has(sectionType))
   }
 
-  const fallbackOrder = resolveSectionOrder({
-    templateType: params.templateType,
-  }).filter(sectionType => allowedSet.has(sectionType))
+  const resultSet = new Set(resolved)
+  for (const sectionType of params.allowedSections) {
+    if (!resultSet.has(sectionType)) {
+      resolved.push(sectionType)
+      resultSet.add(sectionType)
+    }
+  }
+  if (allowedSet.has('intro') && !resultSet.has('intro')) {
+    resolved.unshift('intro')
+  }
+  if (allowedSet.has('sources') && !resultSet.has('sources')) {
+    resolved.push('sources')
+  }
 
-  return uniqueSectionTypes(fallbackOrder)
+  return uniqueSectionTypes(resolved)
 }
 
 function normalizeString(value: unknown, fallback: string): string {
