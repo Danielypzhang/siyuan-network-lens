@@ -129,8 +129,11 @@ function buildWikiSystemPrompt(config: AiConfig, themePrompt?: string, templateT
   const resolvedThemePrompt = resolveThemePrompt(config, themePrompt, templateType)
   if (resolvedThemePrompt) {
     parts.push(resolvedThemePrompt)
-  } else if (config.wikiMaintenancePrompt?.trim()) {
-    parts.push(config.wikiMaintenancePrompt.trim())
+  }
+
+  const globalPrompt = config.wikiMaintenancePrompt?.trim()
+  if (globalPrompt) {
+    parts.push(globalPrompt)
   }
 
   return parts.join('\n\n')
