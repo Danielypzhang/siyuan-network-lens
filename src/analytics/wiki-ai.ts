@@ -126,36 +126,34 @@ function buildWikiSystemPrompt(config: AiConfig, themePrompt?: string, templateT
     parts.push(SOURCE_CITATION_PROMPT)
   }
 
-  const resolvedThemePrompt = resolveThemePrompt(config, themePrompt, templateType)
-  if (resolvedThemePrompt) {
-    parts.push(resolvedThemePrompt)
-  }
-
   const globalPrompt = config.wikiMaintenancePrompt?.trim()
   if (globalPrompt) {
     parts.push(globalPrompt)
+  }
+
+  const resolvedThemePrompt = resolveThemePrompt(config, themePrompt, templateType)
+  if (resolvedThemePrompt) {
+    parts.push(resolvedThemePrompt)
   }
 
   return parts.join('\n\n')
 }
 
 function resolveThemePrompt(config: AiConfig, themePrompt?: string, templateType?: string): string | undefined {
-  const parts: string[] = []
   if (themePrompt?.trim()) {
-    parts.push(themePrompt.trim())
+    return themePrompt.trim()
   }
   if (templateType) {
     const userOverride = config.wikiTemplatePrompts?.[templateType]?.trim()
     if (userOverride) {
-      parts.push(userOverride)
-    } else {
-      const builtIn = DEFAULT_WIKI_TEMPLATE_PROMPTS[templateType]?.trim()
-      if (builtIn) {
-        parts.push(builtIn)
-      }
+      return userOverride
+    }
+    const builtIn = DEFAULT_WIKI_TEMPLATE_PROMPTS[templateType]?.trim()
+    if (builtIn) {
+      return builtIn
     }
   }
-  return parts.length > 0 ? parts.join('\n\n') : undefined
+  return undefined
 }
 
 function buildWikiUserPayload(params: {
