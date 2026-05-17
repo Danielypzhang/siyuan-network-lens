@@ -197,7 +197,16 @@ function normalizeSectionDraftBody(
         return ''
       }
       const inlineRefs = formatInlineSourceRefs(block.sourceRefs, sourceRefIndexMap)
-      return `- ${text}${inlineRefs}`
+      const lines = text.split('\n')
+      const firstLine = `- ${lines[0]}${inlineRefs}`
+      const restLines = lines.slice(1).map((line) => {
+        const trimmed = line.trimStart()
+        if (!trimmed) return ''
+        const indent = line.length - trimmed.length
+        const minIndent = Math.max(indent, 2)
+        return ' '.repeat(minIndent) + trimmed
+      })
+      return [firstLine, ...restLines.filter(Boolean)].join('\n')
     })
     .filter(Boolean)
     .join('\n')
