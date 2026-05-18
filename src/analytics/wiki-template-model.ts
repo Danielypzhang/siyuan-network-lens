@@ -55,6 +55,93 @@ export function buildManualTemplateDiagnosis(templateType: WikiTemplateType): Wi
   }
 }
 
+const DEFAULT_SECTION_GOALS: Partial<Record<WikiTemplateType, Partial<Record<WikiSectionType, string>>>> = {
+  tech_topic: {
+    intro: '简要概述本主题的核心技术要点，不列举文档。',
+    core_principles: '提炼支撑本主题的关键原理和机制。',
+    method_path: '梳理实现或应用本主题的方法路径。',
+    use_cases: '收集本主题的实际应用场景和案例。',
+    sources: '汇总源文档间的引用关系和技术关联。',
+  },
+  product_howto: {
+    intro: '概述产品的核心功能和操作目标。',
+    basic_steps: '分步骤说明基本的操作流程。',
+    advanced_usage: '补充进阶配置和高级操作方法。',
+    faq: '整理常见的操作疑问和解答。',
+    sources: '汇总操作文档间的步骤衔接关系。',
+  },
+  social_topic: {
+    intro: '概述话题背景和社会意义。',
+    viewpoints: '整理不同立场和观点。',
+    controversies: '梳理争议焦点和核心矛盾。',
+    impacts: '分析话题的社会影响和后果。',
+    sources: '汇总观点间的支持和对立关系。',
+  },
+  media_list: {
+    intro: '概述作品集的主题范围和整体特点。',
+    representative_works: '推荐代表性作品并说明理由。',
+    comparison: '对比不同作品的风格和特点。',
+    reading_order: '建议阅读/观看的顺序。',
+    sources: '汇总作品间的关联和参考关系。',
+  },
+}
+
+const DEFAULT_SECTION_FORMATS: Partial<Record<WikiSectionType, WikiSectionFormat>> = {
+  intro: 'overview',
+  core_principles: 'structured',
+  method_path: 'structured',
+  use_cases: 'structured',
+  basic_steps: 'structured',
+  advanced_usage: 'structured',
+  faq: 'qa',
+  troubleshooting: 'qa',
+  viewpoints: 'debate',
+  controversies: 'debate',
+  open_questions: 'overview',
+  cases: 'structured',
+  impacts: 'structured',
+  work_map: 'structured',
+  representative_works: 'catalog',
+  reading_order: 'catalog',
+  comparison: 'structured',
+  misunderstandings: 'structured',
+  conflict: 'debate',
+}
+
+export function buildManualPagePlan(diagnosis: WikiTemplateDiagnosis): WikiPagePlan {
+  const templateType = diagnosis.templateType
+  const defaultSections = WIKI_TEMPLATE_DEFAULT_SECTIONS[templateType] || ['intro', 'sources']
+  const templateGoals = DEFAULT_SECTION_GOALS[templateType] || {}
+  const sectionGoals: WikiPagePlan['sectionGoals'] = {}
+  const sectionFormats: WikiPagePlan['sectionFormats'] = {}
+
+  for (const sectionType of defaultSections) {
+    if (templateGoals[sectionType]) {
+      sectionGoals[sectionType] = templateGoals[sectionType]
+    }
+    if (DEFAULT_SECTION_FORMATS[sectionType]) {
+      sectionFormats[sectionType] = DEFAULT_SECTION_FORMATS[sectionType]
+    }
+  }
+
+  const coreSections = defaultSections.filter(s =>
+    WIKI_SHARED_SECTION_TYPES.includes(s as typeof WIKI_SHARED_SECTION_TYPES[number]),
+  ) as WikiSharedSectionType[]
+  const optionalSections = defaultSections.filter(s =>
+    WIKI_OPTIONAL_SECTION_TYPES.includes(s as typeof WIKI_OPTIONAL_SECTION_TYPES[number]),
+  ) as WikiOptionalSectionType[]
+
+  return {
+    templateType,
+    confidence: 'high',
+    coreSections,
+    optionalSections,
+    sectionOrder: [...defaultSections],
+    sectionGoals,
+    sectionFormats,
+  }
+}
+
 export type WikiSectionFormat = 'overview' | 'structured' | 'qa' | 'debate' | 'catalog'
 
 export type WikiTemplateConfidence = 'high' | 'medium' | 'low'

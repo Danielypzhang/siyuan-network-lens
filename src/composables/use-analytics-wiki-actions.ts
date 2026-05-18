@@ -15,7 +15,7 @@ import { applyWikiDocuments } from '@/analytics/wiki-documents'
 import { resolveScopedPathTarget } from '@/analytics/document-paths'
 import type { WikiThemeBundle } from '@/analytics/wiki-generation'
 import type { WikiTemplateDiagnosis, WikiPagePlan, WikiSectionDraft } from '@/analytics/wiki-template-model'
-import { buildManualTemplateDiagnosis } from '@/analytics/wiki-template-model'
+import { buildManualTemplateDiagnosis, buildManualPagePlan } from '@/analytics/wiki-template-model'
 import { buildThemeWikiPageTitle } from '@/analytics/wiki-page-model'
 import { renderThemeWikiDraft } from '@/analytics/wiki-renderer'
 import { buildWikiPageStorageKey, type AiWikiStore, type WikiPageSnapshotRecord } from '@/analytics/wiki-store'
@@ -443,15 +443,7 @@ export function createAnalyticsWikiActionsController(params: {
             })
 
             batchDiagnosis = buildManualTemplateDiagnosis(manualTemplateType)
-            batchPagePlan = await params.aiWikiService.planThemePage({
-              config: params.appliedConfig.value,
-              payload: batchPayload,
-              diagnosis: batchDiagnosis,
-              existingWikiContent: currentWikiContent,
-              isIncremental: isIncrementalUpdate || cycleIndex > 0 || batchIndex > 0,
-              themePrompt,
-              templateType: batchDiagnosis.templateType,
-            })
+            batchPagePlan = buildManualPagePlan(batchDiagnosis)
             batchSections = await Promise.all(batchPagePlan.sectionOrder.map(sectionType => params.aiWikiService!.generateThemeSection({
               config: params.appliedConfig.value,
               payload: batchPayload,
@@ -497,15 +489,7 @@ export function createAnalyticsWikiActionsController(params: {
           finalSections = batchSections
         } else {
           finalDiagnosis = buildManualTemplateDiagnosis(manualTemplateType)
-          finalPagePlan = await params.aiWikiService.planThemePage({
-            config: params.appliedConfig.value,
-            payload: cyclePayload,
-            diagnosis: finalDiagnosis,
-            existingWikiContent: currentWikiContent,
-            isIncremental: isIncrementalUpdate || cycleIndex > 0,
-            themePrompt,
-            templateType: finalDiagnosis.templateType,
-          })
+          finalPagePlan = buildManualPagePlan(finalDiagnosis)
           finalSections = await Promise.all(finalPagePlan.sectionOrder.map(sectionType => params.aiWikiService!.generateThemeSection({
             config: params.appliedConfig.value,
             payload: cyclePayload,
