@@ -183,7 +183,7 @@ function normalizeSectionDraftBody(
         if (!text) {
           return ''
         }
-        const inlineRefs = formatInlineSourceRefs(block.sourceRefs, sourceRefIndexMap)
+        const inlineRefs = text.includes('<sup>') ? '' : formatInlineSourceRefs(block.sourceRefs, sourceRefIndexMap)
         return `${text}${inlineRefs}`
       })
       .filter(Boolean)
