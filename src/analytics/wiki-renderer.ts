@@ -198,15 +198,28 @@ function normalizeSectionDraftBody(
       }
       const inlineRefs = formatInlineSourceRefs(block.sourceRefs, sourceRefIndexMap)
       const lines = text.split('\n')
-      const firstLine = `- ${lines[0]}${inlineRefs}`
-      const restLines = lines.slice(1).map((line) => {
+      if (lines.length === 1) {
+        return `- ${lines[0]}${inlineRefs}`
+      }
+      const rendered: string[] = []
+      const firstTrimmed = lines[0].trimStart()
+      if (firstTrimmed.startsWith('- ') || firstTrimmed.startsWith('* ')) {
+        rendered.push(`  ${firstTrimmed}`)
+      } else {
+        rendered.push(`- ${firstTrimmed}${inlineRefs}`)
+      }
+      for (const line of lines.slice(1)) {
         const trimmed = line.trimStart()
-        if (!trimmed) return ''
-        const indent = line.length - trimmed.length
-        const minIndent = Math.max(indent, 2)
-        return ' '.repeat(minIndent) + trimmed
-      })
-      return [firstLine, ...restLines.filter(Boolean)].join('\n')
+        if (!trimmed) continue
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          rendered.push(`  ${trimmed}`)
+        } else if (/^\*\*[^*]+\*\*[：:]/.test(trimmed)) {
+          rendered.push(`  - ${trimmed}`)
+        } else {
+          rendered.push(`    ${trimmed}`)
+        }
+      }
+      return rendered.join('\n')
     })
     .filter(Boolean)
     .join('\n')
