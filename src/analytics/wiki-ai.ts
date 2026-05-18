@@ -66,17 +66,16 @@ export interface AiWikiService {
     themePrompt?: string
     templateType?: string
   }) => Promise<WikiPagePlan>
-  generateThemeSection: (params: {
+  generateAllSections: (params: {
     config: AiConfig
     payload: WikiThemeBundle
     diagnosis: WikiTemplateDiagnosis
     pagePlan: WikiPagePlan
-    sectionType: WikiSectionType
     existingWikiContent?: string
     isIncremental?: boolean
     themePrompt?: string
     templateType?: string
-  }) => Promise<WikiSectionDraft>
+  }) => Promise<WikiSectionDraft[]>
 }
 
 const BASE_SYSTEM_PROMPT = [
@@ -160,13 +159,12 @@ function buildWikiUserPayload(params: {
   payload: WikiThemeBundle
   diagnosis?: WikiTemplateDiagnosis
   pagePlan?: WikiPagePlan
-  sectionType?: WikiSectionType
   existingWikiContent?: string
   maxInputTokens?: number
   systemPromptChars?: number
   isIncremental?: boolean
 }): string {
-  const { payload, diagnosis, pagePlan, sectionType, existingWikiContent, maxInputTokens, systemPromptChars, isIncremental } = params
+  const { payload, diagnosis, pagePlan, existingWikiContent, maxInputTokens, systemPromptChars, isIncremental } = params
 
   const CHARS_PER_TOKEN = 2.5
   const systemPromptTokens = (systemPromptChars ?? 0) / CHARS_PER_TOKEN
@@ -275,9 +273,6 @@ function buildWikiUserPayload(params: {
   if (pagePlan) {
     result.pagePlan = pagePlan
   }
-  if (sectionType) {
-    result.sectionType = sectionType
-  }
 
   let content = JSON.stringify(result)
 
@@ -383,25 +378,11 @@ export function createAiWikiService(deps: {
       return normalizePagePlan(parseJsonFromContent(response), params.diagnosis)
     },
 
-    async generateThemeSection(params) {
+    async generateAllSections(params) {
       assertAiReady(params.config)
 
       const requestOptions = resolveAiRequestOptions(params.config)
-      const systemPrompt = (() => {
-        const parts = [
-          buildWikiSystemPrompt(params.config, params.themePrompt, params.templateType),
-          'Generate exactly one wiki section draft.',
-          'The JSON must include sectionType, title, format, blocks, and sourceRefs.',
-          'Each block must include text and sourceRefs.',
-          'For every block, populate sourceRefs with the documentId values from the provided source documents that best support that block content. Use documentId, never blockId.',
-          'For the sources (catalog) section, each block sourceRefs must include all relevant source documentIds so the renderer can produce explicit reference entries.',
-          'For the intro (overview) section, each block text must be a concise self-contained summary sentence. Do not include block IDs, document IDs, or technical identifiers in the visible text.',
-        ]
-        if (params.sectionType === 'conflict') {
-          parts.push(t('analytics.wiki.conflictSectionPrompt'))
-        }
-        return parts.join(' ')
-      })()
+      const systemPrompt = buildWikiSystemPrompt(params.config, params.themePrompt, params.templateType)
 
       const response = await requestChatCompletion({
         config: params.config,
@@ -414,15 +395,14 @@ export function createAiWikiService(deps: {
           {
             role: 'user',
             content: [
-              t('analytics.wiki.generateThemeSectionPrompt', { theme: params.payload.themeName, sectionType: params.sectionType }),
-              t('analytics.wiki.generateThemeSectionSchemaPrompt'),
+              t('analytics.wiki.generateAllSectionsPrompt', { theme: params.payload.themeName }),
+              t('analytics.wiki.generateAllSectionsSchemaPrompt'),
               t('analytics.wiki.conservativeFallbackPrompt'),
               '',
               buildWikiUserPayload({
                 payload: params.payload,
                 diagnosis: params.diagnosis,
                 pagePlan: params.pagePlan,
-                sectionType: params.sectionType,
                 existingWikiContent: params.existingWikiContent,
                 maxInputTokens: requestOptions.maxTokens,
                 systemPromptChars: systemPrompt.length,
@@ -433,7 +413,7 @@ export function createAiWikiService(deps: {
         ],
       })
 
-      return normalizeSectionDraft(parseJsonFromContent(response), params.sectionType)
+      return normalizeAllSectionsDraft(parseJsonFromContent(response), params.pagePlan.sectionOrder)
     },
   }
 }
@@ -640,6 +620,23 @@ function normalizeSectionDraft(value: any, requestedSectionType: WikiSectionType
     blocks,
     sourceRefs,
   }
+}
+
+function normalizeAllSectionsDraft(value: any, sectionOrder: WikiSectionType[]): WikiSectionDraft[] {
+  const rawSections = Array.isArray(value?.sections) ? value.sections : []
+  if (rawSections.length === 0) {
+    return sectionOrder.map(sectionType => normalizeSectionDraft(null, sectionType))
+  }
+  const sectionMap = new Map<WikiSectionType, WikiSectionDraft>()
+  for (const raw of rawSections) {
+    const sectionType = isWikiSectionType(raw?.sectionType) ? raw.sectionType : null
+    if (sectionType) {
+      sectionMap.set(sectionType, normalizeSectionDraft(raw, sectionType))
+    }
+  }
+  return sectionOrder.map(sectionType =>
+    sectionMap.get(sectionType) ?? normalizeSectionDraft(null, sectionType),
+  )
 }
 
 function normalizeDraftBlocks(value: unknown, sectionType: WikiSectionType, forceFallback = false): WikiSectionDraft['blocks'] {

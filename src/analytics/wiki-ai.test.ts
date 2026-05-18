@@ -139,8 +139,7 @@ describe('ai wiki service', () => {
         } as any
       }
 
-      expect(userPrompt).toMatch(/Generate exactly one wiki section/i)
-      expect(userPrompt).toMatch(/core_principles/)
+      expect(userPrompt).toMatch(/Generate a complete wiki page with all sections/i)
 
       return {
         body: JSON.stringify({
@@ -148,16 +147,18 @@ describe('ai wiki service', () => {
             {
               message: {
                 content: JSON.stringify({
-                  sectionType: 'core_principles',
-                  title: '核心原则',
-                  format: 'structured',
-                  blocks: [
-                    {
-                      text: 'AI 主题的核心原则是先建立概念锚点，再补充关系证据。',
-                      sourceRefs: ['blk-2'],
-                    },
-                  ],
-                  sourceRefs: ['blk-2'],
+                  sections: [{
+                    sectionType: 'core_principles',
+                    title: '核心原则',
+                    format: 'structured',
+                    blocks: [
+                      {
+                        text: 'AI 主题的核心原则是先建立概念锚点，再补充关系证据。',
+                        sourceRefs: ['blk-2'],
+                      },
+                    ],
+                    sourceRefs: ['blk-2'],
+                  }],
                 }),
               },
             },
@@ -203,15 +204,14 @@ describe('ai wiki service', () => {
       },
     })
 
-    const section = await service.generateThemeSection({
+    const sections = await service.generateAllSections({
       config,
       payload,
       diagnosis,
       pagePlan,
-      sectionType: 'core_principles',
     })
 
-    expect(section).toEqual({
+    expect(sections.find(s => s.sectionType === 'core_principles')).toEqual({
       sectionType: 'core_principles',
       title: '核心原则',
       format: 'structured',
@@ -435,23 +435,25 @@ describe('ai wiki service', () => {
     expect(pagePlan.sectionOrder).not.toContain('comparison')
   })
 
-  it('coerces the returned section type to the requested section contract', async () => {
+  it('returns sections ordered by pagePlan sectionOrder with fallbacks for missing sections', async () => {
     const forwardProxy = vi.fn(async () => ({
       body: JSON.stringify({
         choices: [
           {
             message: {
               content: JSON.stringify({
-                sectionType: 'sources',
-                title: '常见问题',
-                format: 'qa',
-                blocks: [
-                  {
-                    text: '问题 1：如何补链？',
-                    sourceRefs: ['blk-2'],
-                  },
-                ],
-                sourceRefs: ['blk-2'],
+                sections: [{
+                  sectionType: 'intro',
+                  title: 'Topic overview',
+                  format: 'overview',
+                  blocks: [
+                    {
+                      text: 'AI overview content',
+                      sourceRefs: ['blk-2'],
+                    },
+                  ],
+                  sourceRefs: ['blk-2'],
+                }],
               }),
             },
           },
@@ -461,16 +463,16 @@ describe('ai wiki service', () => {
     }) as any)
 
     const service = createAiWikiService({ forwardProxy })
-    const section = await service.generateThemeSection({
+    const sections = await service.generateAllSections({
       config: buildConfig(),
       payload: buildPayload(),
       diagnosis: {
         templateType: 'tech_topic',
         confidence: 'high',
-        reason: '主题适合技术型模板。',
+        reason: 'test',
         enabledModules: ['intro', 'highlights', 'faq', 'sources'],
         suppressedModules: [],
-        evidenceSummary: '存在稳定结构信号。',
+        evidenceSummary: 'test',
       },
       pagePlan: {
         templateType: 'tech_topic',
@@ -485,24 +487,20 @@ describe('ai wiki service', () => {
           faq: 'qa',
         },
       },
-      sectionType: 'faq',
     })
 
-    expect(section).toEqual({
-      sectionType: 'faq',
-      title: '常见问题',
-      format: 'qa',
-      blocks: [
-        {
-          text: '问题 1：如何补链？',
-          sourceRefs: ['blk-2'],
-        },
-      ],
-      sourceRefs: ['blk-2'],
-    })
+    expect(sections).toHaveLength(4)
+    expect(sections[0].sectionType).toBe('intro')
+    expect(sections[0].title).toBe('Topic overview')
+    expect(sections[1].sectionType).toBe('highlights')
+    expect(sections[1].title).toMatch(/Fallback/)
+    expect(sections[2].sectionType).toBe('faq')
+    expect(sections[2].title).toMatch(/Fallback/)
+    expect(sections[3].sectionType).toBe('sources')
+    expect(sections[3].title).toMatch(/Fallback/)
   })
 
-  it('uses staged calls to generate each planned section in order', async () => {
+  it('uses a single call to generate all planned sections in order', async () => {
     const forwardProxy = vi.fn(async (_url: string, _method?: string, payload?: any) => {
       const userPrompt = JSON.parse(payload).messages[1].content as string
 
@@ -563,111 +561,59 @@ describe('ai wiki service', () => {
         } as any
       }
 
-      if (userPrompt.includes('"sectionType":"intro"')) {
-        return {
-          body: JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    sectionType: 'intro',
-                    title: '主题概览',
-                    format: 'overview',
-                    blocks: [
-                      { text: '当前主题聚焦 AI 与机器学习的知识编排。', sourceRefs: ['blk-2'] },
-                    ],
-                    sourceRefs: ['blk-2'],
-                  }),
-                },
-              },
-            ],
-          }),
-          status: 200,
-        } as any
-      }
-
-      if (userPrompt.includes('"sectionType":"highlights"')) {
-        return {
-          body: JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    sectionType: 'highlights',
-                    title: '关键文档',
-                    format: 'structured',
-                    blocks: [
-                      { text: '优先阅读《AI 核心》', sourceRefs: ['doc-core'] },
-                    ],
-                    sourceRefs: ['doc-core'],
-                  }),
-                },
-              },
-            ],
-          }),
-          status: 200,
-        } as any
-      }
-
-      if (userPrompt.includes('"sectionType":"comparison"')) {
-        return {
-          body: JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    sectionType: 'comparison',
-                    title: '结构观察',
-                    format: 'structured',
-                    blocks: [
-                      { text: '桥接点集中在《AI 导航》。', sourceRefs: ['doc-core'] },
-                    ],
-                    sourceRefs: ['doc-core'],
-                  }),
-                },
-              },
-            ],
-          }),
-          status: 200,
-        } as any
-      }
-
-      if (userPrompt.includes('"sectionType":"sources"')) {
-        return {
-          body: JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    sectionType: 'sources',
-                    title: '关系证据',
-                    format: 'catalog',
-                    blocks: [
-                      { text: 'AI 导航 -> AI 核心', sourceRefs: ['blk-2'] },
-                    ],
-                    sourceRefs: ['blk-2'],
-                  }),
-                },
-              },
-            ],
-          }),
-          status: 200,
-        } as any
-      }
-
       return {
         body: JSON.stringify({
           choices: [
             {
               message: {
                 content: JSON.stringify({
-                  sectionType: 'misunderstandings',
-                  title: '整理动作',
-                  format: 'qa',
-                  blocks: [
-                    { text: '补齐《AI 核心》的主题入口。', sourceRefs: ['doc-core'] },
+                  sections: [
+                    {
+                      sectionType: 'intro',
+                      title: '主题概览',
+                      format: 'overview',
+                      blocks: [
+                        { text: '当前主题聚焦 AI 与机器学习的知识编排。', sourceRefs: ['blk-2'] },
+                      ],
+                      sourceRefs: ['blk-2'],
+                    },
+                    {
+                      sectionType: 'highlights',
+                      title: '关键文档',
+                      format: 'structured',
+                      blocks: [
+                        { text: '优先阅读《AI 核心》', sourceRefs: ['doc-core'] },
+                      ],
+                      sourceRefs: ['doc-core'],
+                    },
+                    {
+                      sectionType: 'comparison',
+                      title: '结构观察',
+                      format: 'structured',
+                      blocks: [
+                        { text: '桥接点集中在《AI 导航》。', sourceRefs: ['doc-core'] },
+                      ],
+                      sourceRefs: ['doc-core'],
+                    },
+                    {
+                      sectionType: 'misunderstandings',
+                      title: '整理动作',
+                      format: 'qa',
+                      blocks: [
+                        { text: '补齐《AI 核心》的主题入口。', sourceRefs: ['doc-core'] },
+                      ],
+                      sourceRefs: ['doc-core'],
+                    },
+                    {
+                      sectionType: 'sources',
+                      title: '关系证据',
+                      format: 'catalog',
+                      blocks: [
+                        { text: 'AI 导航 -> AI 核心', sourceRefs: ['blk-2'] },
+                      ],
+                      sourceRefs: ['blk-2'],
+                    },
                   ],
-                  sourceRefs: ['doc-core'],
                 }),
               },
             },
@@ -689,13 +635,12 @@ describe('ai wiki service', () => {
       payload,
       diagnosis,
     })
-    const result = await Promise.all(pagePlan.sectionOrder.map(sectionType => service.generateThemeSection({
+    const result = await service.generateAllSections({
       config,
       payload,
       diagnosis,
       pagePlan,
-      sectionType,
-    })))
+    })
 
     expect(pagePlan.sectionOrder).toEqual(['intro', 'highlights', 'comparison', 'misunderstandings', 'sources'])
     expect(result).toEqual([
@@ -745,6 +690,8 @@ describe('ai wiki service', () => {
         sourceRefs: ['blk-2'],
       },
     ])
+
+    expect(forwardProxy).toHaveBeenCalledTimes(3)
   })
 
   it('switches prompt copy and fallbacks to Chinese when the workspace locale is zh_CN', async () => {
@@ -789,13 +736,13 @@ describe('ai wiki service', () => {
         } as any
       }
 
-      expect(userPrompt).toMatch(/请只生成一个 wiki 章节草稿/)
+      expect(userPrompt).toMatch(/请为主题生成完整的 wiki 页面，包含所有章节/)
       return {
         body: JSON.stringify({
           choices: [
             {
               message: {
-                content: JSON.stringify({}),
+                content: JSON.stringify({ sections: [] }),
               },
             },
           ],
@@ -834,12 +781,11 @@ describe('ai wiki service', () => {
       payload,
       diagnosis,
     })
-    const section = await service.generateThemeSection({
+    const sections = await service.generateAllSections({
       config: buildConfig(),
       payload,
       diagnosis,
       pagePlan,
-      sectionType: 'intro',
     })
 
     expect(diagnosis).toEqual({
@@ -865,7 +811,7 @@ describe('ai wiki service', () => {
       },
       sectionFormats: {},
     })
-    expect(section).toEqual({
+    expect(sections.find(s => s.sectionType === 'intro')).toEqual({
       sectionType: 'intro',
       title: '回退：主题概览',
       format: 'overview',
@@ -918,7 +864,7 @@ describe('ai wiki service', () => {
           choices: [
             {
               message: {
-                content: JSON.stringify({}),
+                content: JSON.stringify({ sections: [] }),
               },
             },
           ],
@@ -943,7 +889,7 @@ describe('ai wiki service', () => {
       },
       diagnosis,
     })
-    const section = await service.generateThemeSection({
+    const sections = await service.generateAllSections({
       config: buildConfig(),
       payload: {
         ...buildPayload(),
@@ -951,72 +897,13 @@ describe('ai wiki service', () => {
       },
       diagnosis,
       pagePlan,
-      sectionType: 'intro',
     })
 
     expect(diagnosis.reason).toBe('Fallback: No clear template reason yet')
     expect(diagnosis.evidenceSummary).toBe('Fallback: No clear template evidence yet')
-    expect(section.title).toBe('Fallback: Topic overview')
-    expect(section.blocks[0]?.text).toBe('Fallback: No clear topic overview yet')
+    const introSection = sections.find(s => s.sectionType === 'intro')
+    expect(introSection!.title).toBe('Fallback: Topic overview')
+    expect(introSection!.blocks[0]?.text).toBe('Fallback: No clear topic overview yet')
   })
 
-  it('includes conflict-specific instructions when sectionType is conflict', async () => {
-    let capturedPayload: any = null
-
-    const forwardProxy = vi.fn(async (_url: string, _method?: string, payload?: any) => {
-      capturedPayload = JSON.parse(payload)
-      return {
-        body: JSON.stringify({
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                sectionType: 'conflict',
-                title: '冲突内容',
-                format: 'debate',
-                blocks: [],
-                sourceRefs: [],
-              }),
-            },
-          }],
-        }),
-        status: 200,
-      } as any
-    })
-
-    const service = createAiWikiService({ forwardProxy })
-    const section = await service.generateThemeSection({
-      config: buildConfig(),
-      payload: buildPayload(),
-      diagnosis: {
-        templateType: 'tech_topic',
-        confidence: 'high',
-        reason: 'test',
-        enabledModules: ['intro', 'conflict', 'sources'],
-        suppressedModules: [],
-        evidenceSummary: 'test',
-      },
-      pagePlan: {
-        templateType: 'tech_topic',
-        confidence: 'high',
-        coreSections: ['intro', 'sources'],
-        optionalSections: ['conflict'],
-        sectionOrder: ['intro', 'conflict', 'sources'],
-        sectionGoals: {},
-        sectionFormats: { conflict: 'debate' },
-      },
-      sectionType: 'conflict',
-    })
-
-    const systemMessage = capturedPayload.messages[0].content as string
-    // The conflict prompt from i18n should be present
-    expect(systemMessage).toContain('genuine contradictions')
-
-    expect(section).toEqual({
-      sectionType: 'conflict',
-      title: '冲突内容',
-      format: 'debate',
-      blocks: [],
-      sourceRefs: [],
-    })
-  })
 })

@@ -444,17 +444,16 @@ export function createAnalyticsWikiActionsController(params: {
 
             batchDiagnosis = buildManualTemplateDiagnosis(manualTemplateType)
             batchPagePlan = buildManualPagePlan(batchDiagnosis)
-            batchSections = await Promise.all(batchPagePlan.sectionOrder.map(sectionType => params.aiWikiService!.generateThemeSection({
+            batchSections = await params.aiWikiService!.generateAllSections({
               config: params.appliedConfig.value,
               payload: batchPayload,
               diagnosis: batchDiagnosis,
               pagePlan: batchPagePlan,
-              sectionType,
               existingWikiContent: currentWikiContent,
               isIncremental: isIncrementalUpdate || cycleIndex > 0 || batchIndex > 0,
               themePrompt,
               templateType: batchDiagnosis.templateType,
-            })))
+            })
 
             const batchTitleMap = Object.fromEntries(batchPayload.sourceDocuments.map(doc => [doc.documentId, doc.title]))
             const batchDraft = renderThemeWikiDraft({
@@ -490,17 +489,16 @@ export function createAnalyticsWikiActionsController(params: {
         } else {
           finalDiagnosis = buildManualTemplateDiagnosis(manualTemplateType)
           finalPagePlan = buildManualPagePlan(finalDiagnosis)
-          finalSections = await Promise.all(finalPagePlan.sectionOrder.map(sectionType => params.aiWikiService!.generateThemeSection({
+          finalSections = await params.aiWikiService!.generateAllSections({
             config: params.appliedConfig.value,
             payload: cyclePayload,
             diagnosis: finalDiagnosis,
             pagePlan: finalPagePlan,
-            sectionType,
             existingWikiContent: currentWikiContent,
             isIncremental: isIncrementalUpdate || cycleIndex > 0,
             themePrompt,
             templateType: finalDiagnosis.templateType,
-          })))
+          })
 
           const cycleTitleMap = Object.fromEntries(cyclePayload.sourceDocuments.map(doc => [doc.documentId, doc.title]))
           const cycleDraft = renderThemeWikiDraft({

@@ -1790,6 +1790,14 @@ const UI_TEXT = {
         en_US: 'Return JSON only with sectionType, title, format, blocks, and sourceRefs. Each block must include text and sourceRefs. Populate sourceRefs with documentId values (not blockId) from the provided source documents that support each block.',
         zh_CN: '请只返回 JSON，并包含 sectionType、title、format、blocks、sourceRefs。每个 block 必须包含 text 和 sourceRefs。请使用所提供的源文档 documentId（非 blockId）填充每个 block 的 sourceRefs。',
       },
+      generateAllSectionsPrompt: {
+        en_US: 'Generate a complete wiki page with all sections for the current theme. Theme: {theme}.',
+        zh_CN: '请为主题生成完整的 wiki 页面，包含所有章节。主题：{theme}。',
+      },
+      generateAllSectionsSchemaPrompt: {
+        en_US: 'Return JSON only with a sections array. Each section must include sectionType, title, format, blocks, and sourceRefs. Each block must include text and sourceRefs. Populate sourceRefs with documentId values (not blockId) from the provided source documents that support each block. Generate all sections in the order specified by pagePlan.sectionOrder.',
+        zh_CN: '请只返回 JSON，并包含 sections 数组。每个 section 必须包含 sectionType、title、format、blocks、sourceRefs。每个 block 必须包含 text 和 sourceRefs。请使用所提供的源文档 documentId（非 blockId）填充每个 block 的 sourceRefs。按 pagePlan.sectionOrder 的顺序生成所有章节。',
+      },
       generateStructuredContentPrompt: {
         en_US: 'Generate structured content for the topic wiki page. Topic: {theme}.',
         zh_CN: '请为主题 wiki 页面生成结构化内容。主题：{theme}。',

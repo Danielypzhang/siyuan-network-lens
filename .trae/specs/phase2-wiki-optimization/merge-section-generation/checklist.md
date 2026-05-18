@@ -1,0 +1,11 @@
+- [x] system prompt 不包含 "Generate exactly one wiki section draft." 及后续的硬编码 JSON schema 指令
+- [x] AI 调用次数从 N 次（章节数）减少到 1 次
+- [x] 返回的 JSON 格式为 `{ sections: [...] }` 数组
+- [x] generateAllSectionsPrompt i18n 文本中英文已更新
+- [x] generateAllSectionsSchemaPrompt i18n 文本中英文已更新，适配 sections 数组格式
+- [x] use-analytics-wiki-actions.ts 中不再使用 Promise.all + map 调用 generateThemeSection
+- [x] AiWikiService 接口使用 generateAllSections 方法
+- [x] buildWikiUserPayload 不再传递 sectionType 字段
+- [x] 增量更新模式下 existingWikiContent 和 incrementalModePrompt 仍正确传递
+- [x] 测试用例通过
+- [x] 构建通过
