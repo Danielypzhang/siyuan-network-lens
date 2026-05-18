@@ -206,11 +206,6 @@ function normalizeSectionDraftBody(
         return `- ${trimmed}${inlineRefs}`
       }
       const rendered: string[] = []
-      let lastContentIndex = -1
-      for (let i = 0; i < lines.length; i++) {
-        const trimmed = lines[i].trimStart()
-        if (trimmed) lastContentIndex = i
-      }
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
         const trimmed = line.trimStart()
@@ -224,7 +219,7 @@ function normalizeSectionDraftBody(
         const prefix = '  '.repeat(level)
         const isListItem = trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')
         const isBoldHeading = /^\*\*[^*]+\*\*[：:]/.test(trimmed) || /^\*\*[^*]*[：:][^*]*\*\*/.test(trimmed)
-        const lineRefs = i === lastContentIndex ? inlineRefs : ''
+        const lineRefs = i === 0 ? inlineRefs : ''
         if (i === 0) {
           if (isListItem) {
             rendered.push(`${trimmed}${lineRefs}`)
@@ -234,11 +229,11 @@ function normalizeSectionDraftBody(
           continue
         }
         if (isListItem) {
-          rendered.push(`${prefix}${trimmed}${lineRefs}`)
+          rendered.push(`${prefix}${trimmed}`)
         } else if (isBoldHeading) {
-          rendered.push(`- ${trimmed}${lineRefs}`)
+          rendered.push(`- ${trimmed}`)
         } else {
-          rendered.push(`${prefix}  ${trimmed}${lineRefs}`)
+          rendered.push(`${prefix}  ${trimmed}`)
         }
       }
       return rendered.join('\n')
