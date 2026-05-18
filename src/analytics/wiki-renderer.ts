@@ -206,33 +206,27 @@ function normalizeSectionDraftBody(
         return `- ${trimmed}${inlineRefs}`
       }
       const rendered: string[] = []
-      let nextListItemLevel = 1
       for (let i = 0; i < lines.length; i++) {
-        const trimmed = lines[i].trimStart()
+        const line = lines[i]
+        const trimmed = line.trimStart()
         if (!trimmed) continue
+        const indent = line.length - line.trimStart().length
+        const level = Math.round(indent / 2)
+        const prefix = '  '.repeat(level)
         if (i === 0) {
           if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
             rendered.push(`${trimmed}${inlineRefs}`)
           } else {
             rendered.push(`- ${trimmed}${inlineRefs}`)
           }
-          nextListItemLevel = 1
           continue
         }
         if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-          if (nextListItemLevel === 1) {
-            rendered.push(`  ${trimmed}`)
-            nextListItemLevel = 2
-          } else {
-            rendered.push(`    ${trimmed}`)
-            nextListItemLevel = 1
-          }
+          rendered.push(`${prefix}${trimmed}`)
         } else if (/^\*\*[^*]+\*\*[：:]/.test(trimmed)) {
           rendered.push(`- ${trimmed}`)
-          nextListItemLevel = 1
         } else {
-          rendered.push(`    ${trimmed}`)
-          nextListItemLevel = 1
+          rendered.push(`${prefix}  ${trimmed}`)
         }
       }
       return rendered.join('\n')
