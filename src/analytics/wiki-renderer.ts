@@ -196,9 +196,10 @@ function normalizeSectionDraftBody(
       if (!text) {
         return ''
       }
-      const hasInlineRefs = text.includes('<sup>') || text.includes('((')
-      const inlineRefs = hasInlineRefs ? '' : formatInlineSourceRefs(block.sourceRefs, sourceRefIndexMap)
-      const lines = text.split('\n')
+      const hasSupRefs = text.includes('<sup>')
+      const inlineRefs = hasSupRefs ? '' : formatInlineSourceRefs(block.sourceRefs, sourceRefIndexMap)
+      const processedText = hasSupRefs ? text : text.replace(/\(\((\d{14}-[a-z0-9]+)\s+"[^"]*"\)\)/g, '<sup>($&)</sup>')
+      const lines = processedText.split('\n')
       if (lines.length === 1) {
         const trimmed = lines[0].trimStart()
         if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')) {
