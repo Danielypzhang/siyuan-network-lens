@@ -256,10 +256,13 @@ function normalizeSourcesSectionBody(
   const unlinked: string[] = []
 
   for (const block of draft.blocks) {
-    const text = block.text.trim()
+    let text = block.text.trim()
     if (!text) {
       continue
     }
+
+    text = text.replace(/^[《<][^》>]+[》>][：:]\s*/, '')
+    text = text.replace(/\s*\d+\s*$/, '')
 
     const docRefs = block.sourceRefs.filter(ref => isDocumentSourceRef(ref))
     if (!docRefs.length) {
