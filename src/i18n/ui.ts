@@ -1775,8 +1775,8 @@ const UI_TEXT = {
         zh_CN: '请只返回 JSON，并包含 templateType、confidence、reason、enabledModules、suppressedModules、evidenceSummary。',
       },
       planThemePagePrompt: {
-        en_US: 'Generate a wiki page plan from the diagnosis for the current theme. Theme: {theme}. Dynamically choose the most appropriate section combination based on content volume and topic nature — you may select a concise set (e.g. 3–4 sections) or a richer set (e.g. 5–7 sections). Do NOT always include all shared sections; pick only the sections that best serve the topic. The "sources" section must always be the last section in sectionOrder.',
-        zh_CN: '请基于模板诊断结果规划主题 wiki 页面结构。主题：{theme}。请根据内容量和主题性质动态选择最合适的章节组合——可以选择精简组合（如 3–4 个章节）或丰富组合（如 5–7 个章节），不要固定包含所有共享章节，只选择最适合该主题的章节。"sources" 章节必须始终作为 sectionOrder 的最后一个章节。',
+        en_US: 'Generate a wiki page plan for the current theme. Theme: {theme}. Generate the complete page structure according to the template type, ensuring all specified sections are included. The "sources" section must always be the last section in sectionOrder.',
+        zh_CN: '请基于模板诊断结果规划主题 wiki 页面结构。主题：{theme}。请按照模板类型指定的章节组合生成完整的页面结构，确保所有指定章节都被包含。"sources" 章节必须始终作为 sectionOrder 的最后一个章节。',
       },
       planThemePageSchemaPrompt: {
         en_US: 'Return JSON only with templateType, confidence, coreSections, optionalSections, sectionOrder, sectionGoals, and sectionFormats.',

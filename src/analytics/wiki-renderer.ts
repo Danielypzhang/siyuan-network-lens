@@ -199,24 +199,40 @@ function normalizeSectionDraftBody(
       const inlineRefs = formatInlineSourceRefs(block.sourceRefs, sourceRefIndexMap)
       const lines = text.split('\n')
       if (lines.length === 1) {
-        return `- ${lines[0]}${inlineRefs}`
+        const trimmed = lines[0].trimStart()
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          return `${trimmed}${inlineRefs}`
+        }
+        return `- ${trimmed}${inlineRefs}`
       }
       const rendered: string[] = []
-      const firstTrimmed = lines[0].trimStart()
-      if (firstTrimmed.startsWith('- ') || firstTrimmed.startsWith('* ')) {
-        rendered.push(`  ${firstTrimmed}`)
-      } else {
-        rendered.push(`- ${firstTrimmed}${inlineRefs}`)
-      }
-      for (const line of lines.slice(1)) {
-        const trimmed = line.trimStart()
+      let nextListItemLevel = 1
+      for (let i = 0; i < lines.length; i++) {
+        const trimmed = lines[i].trimStart()
         if (!trimmed) continue
+        if (i === 0) {
+          if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            rendered.push(`${trimmed}${inlineRefs}`)
+          } else {
+            rendered.push(`- ${trimmed}${inlineRefs}`)
+          }
+          nextListItemLevel = 1
+          continue
+        }
         if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-          rendered.push(`  ${trimmed}`)
+          if (nextListItemLevel === 1) {
+            rendered.push(`  ${trimmed}`)
+            nextListItemLevel = 2
+          } else {
+            rendered.push(`    ${trimmed}`)
+            nextListItemLevel = 1
+          }
         } else if (/^\*\*[^*]+\*\*[：:]/.test(trimmed)) {
-          rendered.push(`  - ${trimmed}`)
+          rendered.push(`- ${trimmed}`)
+          nextListItemLevel = 1
         } else {
           rendered.push(`    ${trimmed}`)
+          nextListItemLevel = 1
         }
       }
       return rendered.join('\n')
