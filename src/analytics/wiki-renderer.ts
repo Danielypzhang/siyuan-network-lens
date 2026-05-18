@@ -196,7 +196,8 @@ function normalizeSectionDraftBody(
       if (!text) {
         return ''
       }
-      const inlineRefs = formatInlineSourceRefs(block.sourceRefs, sourceRefIndexMap)
+      const hasInlineRefs = text.includes('<sup>') || text.includes('((')
+      const inlineRefs = hasInlineRefs ? '' : formatInlineSourceRefs(block.sourceRefs, sourceRefIndexMap)
       const lines = text.split('\n')
       if (lines.length === 1) {
         const trimmed = lines[0].trimStart()
