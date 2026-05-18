@@ -542,6 +542,13 @@ export function createAnalyticsWikiActionsController(params: {
         }
       }
 
+      if (!finalDiagnosis) {
+        finalDiagnosis = buildManualTemplateDiagnosis(manualTemplateType)
+      }
+      if (!finalPagePlan) {
+        finalPagePlan = buildManualPagePlan(finalDiagnosis)
+      }
+
       const remainingDocCount = sortedChangedIds.length - processedDocIds.size
       if (remainingDocCount > 0) {
         params.notify(
