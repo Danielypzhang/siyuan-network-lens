@@ -110,11 +110,8 @@ const SIYUAN_BLOCK_ID_PATTERN = /^[0-9a-f]{22}$/
 
 function sanitizeAiHtml(text: string): string {
   return text.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g, (match, tagName) => {
-    if (tagName.toLowerCase() === 'sup' && /^<sup>/.test(match)) {
-      return '<sup>'
-    }
-    if (tagName.toLowerCase() === 'sup' && /^<\/sup>/.test(match)) {
-      return '</sup>'
+    if (tagName.toLowerCase() === 'sup') {
+      return match.startsWith('</') ? '</sup>' : '<sup>'
     }
     return ''
   })
