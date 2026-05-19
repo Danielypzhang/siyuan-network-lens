@@ -1,5 +1,6 @@
 import type { DocumentRecord } from './analysis'
 import { normalizeTags, resolveDocumentTitle } from './document-utils'
+import { parseJsonArray } from './wiki-utils'
 import type { PluginConfig } from '@/types/config'
 
 const AI_INDEX_STORAGE_NAME = 'ai-document-index.json'
@@ -233,19 +234,6 @@ function parseStringArray(value?: string): string[] {
     return Array.isArray(JSON.parse(value))
       ? JSON.parse(value).filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0)
       : []
-  } catch {
-    return []
-  }
-}
-
-function parseJsonArray<T>(value?: string): T[] {
-  if (!value) {
-    return []
-  }
-
-  try {
-    const parsed = JSON.parse(value)
-    return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
   }

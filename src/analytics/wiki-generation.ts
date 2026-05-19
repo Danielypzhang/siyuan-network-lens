@@ -10,6 +10,7 @@ import type {
 } from './ai-index-store'
 import { buildThemeWikiPageTitle } from './wiki-page-model'
 import type { WikiScopeResult } from './wiki-scope'
+import { parseJsonArray, resolveDocumentFallbackTitle } from './wiki-utils'
 import type { PluginConfig } from '@/types/config'
 
 export type WikiDeltaStatus = 'new' | 'changed' | 'unchanged' | 'deleted'
@@ -205,8 +206,8 @@ function buildRelationshipEvidence(params: {
       if (!sourceDocumentIdSet.has(ref.sourceDocumentId)) {
         continue
       }
-      const sourceTitle = resolveTitle(params.documentMap.get(ref.sourceDocumentId), ref.sourceDocumentId)
-      const targetTitle = resolveTitle(params.documentMap.get(targetDocumentId), targetDocumentId)
+      const sourceTitle = resolveDocumentFallbackTitle(params.documentMap.get(ref.sourceDocumentId), ref.sourceDocumentId)
+      const targetTitle = resolveDocumentFallbackTitle(params.documentMap.get(targetDocumentId), targetDocumentId)
       evidence.push(`${sourceTitle} -> ${targetTitle}：${ref.content}`)
     }
   }
@@ -241,21 +242,4 @@ function parseStringArray(value?: string): string[] {
     .filter((item): item is string => typeof item === 'string')
     .map(item => item.trim())
     .filter(Boolean)
-}
-
-function parseJsonArray<T>(value?: string): T[] {
-  if (!value) {
-    return []
-  }
-
-  try {
-    const parsed = JSON.parse(value)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function resolveTitle(document: DocumentRecord | undefined, fallbackId: string): string {
-  return document?.title || document?.hpath || document?.path || fallbackId
 }

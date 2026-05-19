@@ -18,6 +18,7 @@ import type { WikiTemplateDiagnosis, WikiPagePlan, WikiSectionDraft } from '@/an
 import { buildManualTemplateDiagnosis, buildManualPagePlan } from '@/analytics/wiki-template-model'
 import { buildThemeWikiPageTitle } from '@/analytics/wiki-page-model'
 import { renderThemeWikiDraft } from '@/analytics/wiki-renderer'
+import { parseJsonArray, resolveDocumentFallbackTitle } from '@/analytics/wiki-utils'
 import { buildWikiPageStorageKey, type AiWikiStore, type WikiPageSnapshotRecord } from '@/analytics/wiki-store'
 import type { WikiPreviewCacheStore } from '@/analytics/wiki-preview-store'
 import type { AnalyticsSnapshot } from '@/analytics/siyuan-data'
@@ -52,11 +53,12 @@ type GetChildBlocksFn = (id: string) => Promise<Array<{ id: string, type?: strin
 type GetBlockKramdownFn = (id: string) => Promise<{ id: string, kramdown: string }>
 type GetBlockAttrsFn = (id: string) => Promise<{ [key: string]: string }>
 type SetBlockAttrsFn = (id: string, attrs: { [key: string]: string }) => Promise<any>
+type HttpHeader = { [key: string]: string }
 type ForwardProxyFn = (
   url: string,
   method?: string,
-  payload?: any,
-  headers?: any[],
+  payload?: string,
+  headers?: HttpHeader[],
   timeout?: number,
   contentType?: string,
 ) => Promise<IResForwardProxy>
@@ -334,14 +336,11 @@ export function createAnalyticsWikiActionsController(params: {
         .filter(([, status]) => status === 'new' || status === 'changed')
         .map(([id]) => id)
 
-      const coreDocIds = new Set(params.report.value.ranking.map(item => item.documentId))
-      const bridgeDocIds = new Set(params.report.value.bridgeDocuments.map(item => item.documentId))
-
-      const sortedChangedIds = [...allChangedDocIds].sort((a, b) => {
-        const priorityA = coreDocIds.has(a) ? 0 : bridgeDocIds.has(a) ? 1 : 2
-        const priorityB = coreDocIds.has(b) ? 0 : bridgeDocIds.has(b) ? 1 : 2
-        return priorityA - priorityB
-      })
+      const sortedChangedIds = sortChangedDocIdsByPriority(
+        allChangedDocIds,
+        params.report.value.ranking.map(item => item.documentId),
+        params.report.value.bridgeDocuments.map(item => item.documentId),
+      )
 
       const MAX_CYCLES = 3
       const docsPerCycle = maxSourceDocs > 0 ? maxSourceDocs : sortedChangedIds.length
@@ -529,18 +528,11 @@ export function createAnalyticsWikiActionsController(params: {
         })
       }
 
-      const sourceDocumentTimestamps: Record<string, string> = {}
-      const previousTimestamps = storedRecord?.sourceDocumentTimestamps
-      if (previousTimestamps) {
-        for (const [id, ts] of Object.entries(previousTimestamps)) {
-          sourceDocumentTimestamps[id] = ts
-        }
-      }
-      for (const doc of effectiveSourceDocuments) {
-        if (processedDocIds.has(doc.id)) {
-          sourceDocumentTimestamps[doc.id] = doc.updated
-        }
-      }
+      const sourceDocumentTimestamps = buildSourceDocumentTimestamps(
+        effectiveSourceDocuments,
+        processedDocIds,
+        storedRecord?.sourceDocumentTimestamps,
+      )
 
       if (!finalDiagnosis) {
         finalDiagnosis = buildManualTemplateDiagnosis(manualTemplateType)
@@ -904,8 +896,8 @@ function buildSingleThemeWikiPayload(params: {
       if (!sourceDocumentIdSet.has(ref.sourceDocumentId)) {
         continue
       }
-      const sourceTitle = resolveTitle(params.documentMap.get(ref.sourceDocumentId), ref.sourceDocumentId)
-      const targetTitle = resolveTitle(params.documentMap.get(targetDocumentId), targetDocumentId)
+      const sourceTitle = resolveDocumentFallbackTitle(params.documentMap.get(ref.sourceDocumentId), ref.sourceDocumentId)
+      const targetTitle = resolveDocumentFallbackTitle(params.documentMap.get(targetDocumentId), targetDocumentId)
       relationshipEvidence.push(`${sourceTitle} -> ${targetTitle}：${ref.content}`)
     }
   }
@@ -932,22 +924,6 @@ function buildSingleThemeWikiPayload(params: {
       relationshipEvidence,
     },
   }
-}
-
-function parseJsonArray<T>(value?: string): T[] {
-  if (!value) {
-    return []
-  }
-  try {
-    const parsed = JSON.parse(value)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function resolveTitle(document: DocumentRecord | undefined, fallbackId: string): string {
-  return document?.title || document?.hpath || document?.path || fallbackId
 }
 
 function computeSourceDocumentDeltas(
@@ -983,4 +959,37 @@ function computeSourceDocumentDeltas(
   }
 
   return deltas
+}
+
+function sortChangedDocIdsByPriority(
+  changedDocIds: string[],
+  coreDocIds: string[],
+  bridgeDocIds: string[],
+): string[] {
+  const coreSet = new Set(coreDocIds)
+  const bridgeSet = new Set(bridgeDocIds)
+  return [...changedDocIds].sort((a, b) => {
+    const priorityA = coreSet.has(a) ? 0 : bridgeSet.has(a) ? 1 : 2
+    const priorityB = coreSet.has(b) ? 0 : bridgeSet.has(b) ? 1 : 2
+    return priorityA - priorityB
+  })
+}
+
+function buildSourceDocumentTimestamps(
+  effectiveSourceDocuments: Array<{ id: string, updated: string }>,
+  processedDocIds: Set<string>,
+  previousTimestamps?: Record<string, string>,
+): Record<string, string> {
+  const timestamps: Record<string, string> = {}
+  if (previousTimestamps) {
+    for (const [id, ts] of Object.entries(previousTimestamps)) {
+      timestamps[id] = ts
+    }
+  }
+  for (const doc of effectiveSourceDocuments) {
+    if (processedDocIds.has(doc.id)) {
+      timestamps[doc.id] = doc.updated
+    }
+  }
+  return timestamps
 }

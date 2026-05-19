@@ -4,6 +4,7 @@ import type { WikiThemeBundle } from './wiki-generation'
 import {
   WIKI_OPTIONAL_SECTION_TYPES,
   WIKI_SECTION_TYPES,
+  WIKI_SHARED_SECTION_TYPES,
   WIKI_TEMPLATE_DEFAULT_SECTIONS,
   WIKI_TEMPLATE_TYPES,
   type WikiPagePlan,
@@ -14,17 +15,17 @@ import {
   type WikiTemplateDiagnosis,
   type WikiTemplateType,
 } from './wiki-template-model'
-
-const SHARED_SECTION_TYPES = ['intro', 'highlights', 'sources'] as const
 import { resolveSectionOrder } from './wiki-template-selection'
 import { resolveUiLocale, t } from '@/i18n/ui'
 import { DEFAULT_WIKI_TEMPLATE_PROMPTS, type PluginConfig } from '@/types/config'
 
+type HttpHeader = { [key: string]: string }
+
 type ForwardProxyFn = (
   url: string,
   method?: string,
-  payload?: any,
-  headers?: any[],
+  payload?: string,
+  headers?: HttpHeader[],
   timeout?: number,
   contentType?: string,
 ) => Promise<IResForwardProxy>
@@ -182,7 +183,7 @@ function buildWikiUserPayload(params: {
   const hasExistingWiki = Boolean(existingWikiContent)
 
   const prioritizedDocs = payload.sourceDocuments.map(doc => {
-    const deltaStatus = (doc as any).deltaStatus as string | undefined
+    const deltaStatus = doc.deltaStatus
     const isUnchanged = isIncremental && hasExistingWiki && deltaStatus === 'unchanged'
     const isDeleted = deltaStatus === 'deleted'
 
@@ -464,7 +465,6 @@ async function requestChatCompletion(params: {
     console.error('[NetworkLens][Wiki] Failed to parse AI response as JSON:', {
       status: response?.status,
       bodyLength: response?.body?.length ?? 0,
-      bodyPreview: response?.body?.slice?.(0, 200) ?? '',
       error: parseError instanceof Error ? parseError.message : String(parseError),
     })
     throw new Error(t('analytics.wiki.aiReturnedUnparseableJson'))
@@ -487,7 +487,6 @@ function parseJsonFromContent(payload: any) {
       } catch (secondError) {
         console.error('[NetworkLens][Wiki] Failed to parse AI content JSON after extraction:', {
           candidateLength: candidate.length,
-          candidatePreview: candidate.slice(0, 300),
           extractedRange: `${startIndex}-${endIndex}`,
           firstError: firstError instanceof Error ? firstError.message : String(firstError),
           secondError: secondError instanceof Error ? secondError.message : String(secondError),
@@ -496,7 +495,6 @@ function parseJsonFromContent(payload: any) {
     } else {
       console.error('[NetworkLens][Wiki] AI returned content with no JSON object:', {
         candidateLength: candidate.length,
-        candidatePreview: candidate.slice(0, 300),
         error: firstError instanceof Error ? firstError.message : String(firstError),
       })
     }
@@ -555,9 +553,9 @@ function normalizePagePlan(value: any, diagnosis: WikiTemplateDiagnosis): WikiPa
   const confidence = isWikiTemplateConfidence(value?.confidence) ? value.confidence : diagnosis.confidence
   const templateDefaults = WIKI_TEMPLATE_DEFAULT_SECTIONS[templateType]
   const defaultCoreSections = templateDefaults.filter(
-    (s): s is typeof SHARED_SECTION_TYPES[number] => SHARED_SECTION_TYPES.includes(s as typeof SHARED_SECTION_TYPES[number]),
+    (s): s is typeof WIKI_SHARED_SECTION_TYPES[number] => WIKI_SHARED_SECTION_TYPES.includes(s as typeof WIKI_SHARED_SECTION_TYPES[number]),
   )
-  const coreSections = uniqueSharedSectionTypes([
+  const coreSections = unique([
     ...defaultCoreSections,
     ...normalizeSharedSectionList(value?.coreSections, defaultCoreSections),
   ])
@@ -608,7 +606,7 @@ function normalizeSectionDraft(value: any, requestedSectionType: WikiSectionType
     : inferSectionFormat(sectionType)
   const fallbackUsed = !Array.isArray(value?.blocks) || typeof value?.title !== 'string'
   const blocks = normalizeDraftBlocks(value?.blocks, sectionType, fallbackUsed)
-  const sourceRefs = uniqueStrings([
+  const sourceRefs = unique([
     ...normalizeStringList(value?.sourceRefs),
     ...blocks.flatMap(block => block.sourceRefs),
   ])
@@ -631,6 +629,9 @@ function normalizeAllSectionsDraft(value: any, sectionOrder: WikiSectionType[]):
   for (const raw of rawSections) {
     const sectionType = isWikiSectionType(raw?.sectionType) ? raw.sectionType : null
     if (sectionType) {
+      if (sectionMap.has(sectionType)) {
+        console.warn('[NetworkLens][Wiki] Duplicate sectionType in AI response, last occurrence wins:', sectionType)
+      }
       sectionMap.set(sectionType, normalizeSectionDraft(raw, sectionType))
     }
   }
@@ -722,7 +723,7 @@ function normalizePlannedSectionOrder(
   },
 ): WikiSectionType[] {
   const allowedSet = new Set(params.allowedSections)
-  const filteredRequested = uniqueSectionTypes(requestedOrder.filter(sectionType => allowedSet.has(sectionType)))
+  const filteredRequested = unique(requestedOrder.filter(sectionType => allowedSet.has(sectionType)))
 
   if (filteredRequested.length > 0) {
     const resolved = resolveSectionOrder({
@@ -744,7 +745,7 @@ function normalizePlannedSectionOrder(
     templateType: params.templateType,
   }).filter(sectionType => allowedSet.has(sectionType))
 
-  return uniqueSectionTypes(fallbackOrder)
+  return unique(fallbackOrder)
 }
 
 function normalizeString(value: unknown, fallback: string): string {
@@ -772,7 +773,7 @@ function buildAllowedPagePlanSections(params: {
   const suppressed = new Set<WikiSectionType>(params.suppressedModules.filter(sectionType => !isWikiSharedSectionType(sectionType)))
   const templateDefaults = WIKI_TEMPLATE_DEFAULT_SECTIONS[params.templateType]
 
-  return uniqueSectionTypes([
+  return unique([
     ...templateDefaults,
     ...params.enabledModules,
     ...params.optionalSections,
@@ -784,29 +785,29 @@ function normalizeStringList(value: unknown): string[] {
     return []
   }
 
-  return uniqueStrings(value.filter((item): item is string => typeof item === 'string').map(item => item.trim()).filter(Boolean))
+  return unique(value.filter((item): item is string => typeof item === 'string').map(item => item.trim()).filter(Boolean))
 }
 
 function normalizeSectionTypeList(value: unknown, fallback: WikiSectionType[]): WikiSectionType[] {
   if (!Array.isArray(value)) {
-    return uniqueSectionTypes(fallback)
+    return unique(fallback)
   }
 
-  return uniqueSectionTypes(value.filter(isWikiSectionType)).length > 0
-    ? uniqueSectionTypes(value.filter(isWikiSectionType))
-    : uniqueSectionTypes(fallback)
+  return unique(value.filter(isWikiSectionType)).length > 0
+    ? unique(value.filter(isWikiSectionType))
+    : unique(fallback)
 }
 
 function normalizeSharedSectionList(
   value: unknown,
-  fallback: typeof SHARED_SECTION_TYPES[number][],
-): typeof SHARED_SECTION_TYPES[number][] {
+  fallback: typeof WIKI_SHARED_SECTION_TYPES[number][],
+): typeof WIKI_SHARED_SECTION_TYPES[number][] {
   if (!Array.isArray(value)) {
-    return uniqueSharedSectionTypes(fallback)
+    return unique(fallback)
   }
 
-  const sections = uniqueSharedSectionTypes(value.filter(isWikiSharedSectionType))
-  return sections.length > 0 ? sections : uniqueSharedSectionTypes(fallback)
+  const sections = unique(value.filter(isWikiSharedSectionType))
+  return sections.length > 0 ? sections : unique(fallback)
 }
 
 function normalizeOptionalSectionList(
@@ -814,26 +815,14 @@ function normalizeOptionalSectionList(
   fallback: typeof WIKI_OPTIONAL_SECTION_TYPES[number][],
 ): typeof WIKI_OPTIONAL_SECTION_TYPES[number][] {
   if (!Array.isArray(value)) {
-    return uniqueOptionalSectionTypes(fallback)
+    return unique(fallback)
   }
 
-  const sections = uniqueOptionalSectionTypes(value.filter(isWikiOptionalSectionType))
-  return sections.length > 0 ? sections : uniqueOptionalSectionTypes(fallback)
+  const sections = unique(value.filter(isWikiOptionalSectionType))
+  return sections.length > 0 ? sections : unique(fallback)
 }
 
-function uniqueStrings(values: string[]): string[] {
-  return [...new Set(values)]
-}
-
-function uniqueSectionTypes(values: WikiSectionType[]): WikiSectionType[] {
-  return [...new Set(values)]
-}
-
-function uniqueSharedSectionTypes(values: typeof SHARED_SECTION_TYPES[number][]) {
-  return [...new Set(values)]
-}
-
-function uniqueOptionalSectionTypes(values: typeof WIKI_OPTIONAL_SECTION_TYPES[number][]) {
+function unique<T>(values: T[]): T[] {
   return [...new Set(values)]
 }
 
@@ -899,8 +888,8 @@ function isWikiSectionType(value: unknown): value is WikiSectionType {
   return typeof value === 'string' && WIKI_SECTION_TYPES.includes(value as WikiSectionType)
 }
 
-function isWikiSharedSectionType(value: unknown): value is typeof SHARED_SECTION_TYPES[number] {
-  return typeof value === 'string' && SHARED_SECTION_TYPES.includes(value as typeof SHARED_SECTION_TYPES[number])
+function isWikiSharedSectionType(value: unknown): value is typeof WIKI_SHARED_SECTION_TYPES[number] {
+  return typeof value === 'string' && WIKI_SHARED_SECTION_TYPES.includes(value as typeof WIKI_SHARED_SECTION_TYPES[number])
 }
 
 function isWikiOptionalSectionType(value: unknown): value is typeof WIKI_OPTIONAL_SECTION_TYPES[number] {

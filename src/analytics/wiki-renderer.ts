@@ -105,10 +105,23 @@ function formatGeneratedAt(isoString: string): string {
   return `${val('year')}-${val('month')}-${val('day')} ${val('hour')}:${val('minute')}`
 }
 
-const BLOCK_ID_PATTERN = /^[0-9a-f]{22}$/
+const SIYUAN_DOC_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/
+const SIYUAN_BLOCK_ID_PATTERN = /^[0-9a-f]{22}$/
+
+function sanitizeAiHtml(text: string): string {
+  return text.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g, (match, tagName) => {
+    if (tagName.toLowerCase() === 'sup' && /^<sup>/.test(match)) {
+      return '<sup>'
+    }
+    if (tagName.toLowerCase() === 'sup' && /^<\/sup>/.test(match)) {
+      return '</sup>'
+    }
+    return ''
+  })
+}
 
 function isDocumentSourceRef(ref: string): boolean {
-  return !BLOCK_ID_PATTERN.test(ref)
+  return SIYUAN_DOC_ID_PATTERN.test(ref) || (!SIYUAN_BLOCK_ID_PATTERN.test(ref) && ref.length > 0)
 }
 
 function buildSourceRefIndexMap(sections: WikiSectionDraft[]): Map<string, number> {
@@ -179,7 +192,7 @@ function normalizeSectionDraftBody(
   if (draft.format === 'overview') {
     return draft.blocks
       .map((block) => {
-        const text = block.text.trim()
+        const text = sanitizeAiHtml(block.text.trim())
         if (!text) {
           return ''
         }
@@ -192,7 +205,7 @@ function normalizeSectionDraftBody(
 
   return draft.blocks
     .map((block) => {
-      const text = block.text.trim()
+      const text = sanitizeAiHtml(block.text.trim())
       if (!text) {
         return ''
       }
@@ -207,41 +220,45 @@ function normalizeSectionDraftBody(
         }
         return `- ${trimmed}${inlineRefs}`
       }
-      const rendered: string[] = []
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]
-        const trimmed = line.trimStart()
-        if (!trimmed) continue
-        if (/^-{3,}$/.test(trimmed)) {
-          rendered.push('---')
-          continue
-        }
-        const indent = line.length - line.trimStart().length
-        const level = Math.round(indent / 2)
-        const prefix = '  '.repeat(level)
-        const isListItem = trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')
-        const isBoldHeading = /^\*\*[^*]+\*\*[：:]/.test(trimmed) || /^\*\*[^*]*[：:][^*]*\*\*/.test(trimmed)
-        const lineRefs = i === 0 ? inlineRefs : ''
-        if (i === 0) {
-          if (isListItem) {
-            rendered.push(`${trimmed}${lineRefs}`)
-          } else {
-            rendered.push(`- ${trimmed}${lineRefs}`)
-          }
-          continue
-        }
-        if (isListItem) {
-          rendered.push(`${prefix}${trimmed}`)
-        } else if (isBoldHeading) {
-          rendered.push(`- ${trimmed}`)
-        } else {
-          rendered.push(`${prefix}  ${trimmed}`)
-        }
-      }
-      return rendered.join('\n')
+      return renderStructuredBlockLines(lines, inlineRefs)
     })
     .filter(Boolean)
     .join('\n')
+}
+
+function renderStructuredBlockLines(lines: string[], inlineRefs: string): string {
+  const rendered: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const trimmed = line.trimStart()
+    if (!trimmed) continue
+    if (/^-{3,}$/.test(trimmed)) {
+      rendered.push('---')
+      continue
+    }
+    const indent = line.length - line.trimStart().length
+    const level = Math.round(indent / 2)
+    const prefix = '  '.repeat(level)
+    const isListItem = trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')
+    const isBoldHeading = /^\*\*[^*]+\*\*[：:]/.test(trimmed) || /^\*\*[^*：:]+[：:][^*]*\*\*/.test(trimmed)
+    const lineRefs = i === 0 ? inlineRefs : ''
+    if (i === 0) {
+      if (isListItem) {
+        rendered.push(`${trimmed}${lineRefs}`)
+      } else {
+        rendered.push(`- ${trimmed}${lineRefs}`)
+      }
+      continue
+    }
+    if (isListItem) {
+      rendered.push(`${prefix}${trimmed}`)
+    } else if (isBoldHeading) {
+      rendered.push(`- ${trimmed}`)
+    } else {
+      rendered.push(`${prefix}  ${trimmed}`)
+    }
+  }
+  return rendered.join('\n')
 }
 
 function normalizeSourcesSectionBody(
@@ -256,13 +273,13 @@ function normalizeSourcesSectionBody(
   const unlinked: string[] = []
 
   for (const block of draft.blocks) {
-    let text = block.text.trim()
+    let text = sanitizeAiHtml(block.text.trim())
     if (!text) {
       continue
     }
 
     text = text.replace(/^[《<][^》>]+[》>][：:]\s*/, '')
-    text = text.replace(/\s*\d+\s*$/, '')
+    text = text.replace(/\s+\d{1,2}\s*$/, '')
 
     const docRefs = block.sourceRefs.filter(ref => isDocumentSourceRef(ref))
     if (!docRefs.length) {

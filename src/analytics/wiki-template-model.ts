@@ -6,7 +6,7 @@ export const WIKI_TEMPLATE_TYPES = [
 ] as const
 export type WikiTemplateType = typeof WIKI_TEMPLATE_TYPES[number]
 
-const WIKI_SHARED_SECTION_TYPES = ['intro', 'highlights', 'sources'] as const
+export const WIKI_SHARED_SECTION_TYPES = ['intro', 'highlights', 'sources'] as const
 export type WikiSharedSectionType = typeof WIKI_SHARED_SECTION_TYPES[number]
 
 export const WIKI_OPTIONAL_SECTION_TYPES = [
