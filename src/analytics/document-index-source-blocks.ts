@@ -24,6 +24,8 @@ const MARKDOWN_IMAGE_PATTERN = /!\[[^\]]*\]\([^)]*\)/g
 
 const LOW_VALUE_BLOCK_TYPES = new Set(['h', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
 
+const SELF_CONTAINED_BLOCK_TYPES = new Set(['d', 'p'])
+
 export function filterLowValueBlocks(candidates: SourceBlockCandidate[]): SourceBlockCandidate[] {
   return candidates.filter(c => {
     if (c.charCount < SECONDARY_CHAR_THRESHOLD) return false
@@ -63,21 +65,35 @@ export async function collectDocumentSourceBlocks(params: {
   documentId: string
   getBlockKramdown: (id: string) => Promise<{ id: string, kramdown: string }>
   getChildBlocks: (id: string) => Promise<Array<{ id: string, type?: string, subtype?: string }>>
+  getBlockType?: (id: string) => Promise<string | undefined>
 }): Promise<ClassifiedSourceBlocks> {
   let rootText = ''
+  let blockType: string | undefined
 
   try {
     const { kramdown: rootKramdown } = await params.getBlockKramdown(params.documentId)
     rootText = stripKramdownMarkers(rootKramdown)
   } catch {
-    // getBlockKramdown failed, try child blocks instead
+    // getBlockKramdown failed
   }
 
-  if (rootText.length >= PRIMARY_CHAR_THRESHOLD) {
-    return {
-      primary: [{ blockId: params.documentId, text: rootText }],
-      secondary: [],
+  try {
+    blockType = params.getBlockType ? await params.getBlockType(params.documentId) : undefined
+  } catch {
+    // getBlockType failed
+  }
+
+  const isSelfContained = blockType ? SELF_CONTAINED_BLOCK_TYPES.has(blockType) : rootText.length >= PRIMARY_CHAR_THRESHOLD
+
+  if (isSelfContained) {
+    if (rootText.length >= SECONDARY_CHAR_THRESHOLD) {
+      const isPrimary = rootText.length >= PRIMARY_CHAR_THRESHOLD
+      return {
+        primary: isPrimary ? [{ blockId: params.documentId, text: rootText }] : [],
+        secondary: isPrimary ? [] : [{ blockId: params.documentId, text: rootText }],
+      }
     }
+    return { primary: [], secondary: [] }
   }
 
   try {

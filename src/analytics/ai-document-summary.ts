@@ -22,6 +22,8 @@ type GetBlockKramdownFn = (id: string) => Promise<{ id: string, kramdown: string
 
 type GetChildBlocksFn = (id: string) => Promise<Array<{ id: string, type?: string, subtype?: string }>>
 
+type GetBlockTypeFn = (id: string) => Promise<string | undefined>
+
 type AiConfig = Pick<
   PluginConfig,
   | 'aiBaseUrl'
@@ -92,6 +94,7 @@ export async function ensureDocumentIndex(params: {
   forwardProxy: ForwardProxyFn
   getBlockKramdown: GetBlockKramdownFn
   getChildBlocks: GetChildBlocksFn
+  getBlockType?: GetBlockTypeFn
   force?: boolean
   updatedAt?: string
 }): Promise<{ fromCache: boolean, updatedAt: string }> {
@@ -117,6 +120,7 @@ export async function ensureDocumentIndex(params: {
     documentId: params.sourceDocument.id,
     getBlockKramdown: params.getBlockKramdown,
     getChildBlocks: params.getChildBlocks,
+    getBlockType: params.getBlockType,
   })
 
   const result = await requestEvidenceCompilation({
@@ -147,6 +151,7 @@ export async function ensureDocumentSummary(params: {
   forwardProxy?: ForwardProxyFn
   getBlockKramdown?: GetBlockKramdownFn
   getChildBlocks?: GetChildBlocksFn
+  getBlockType?: GetBlockTypeFn
   force?: boolean
   updatedAt?: string
 }): Promise<EnsuredDocumentSummaryResult> {
@@ -170,6 +175,7 @@ export async function ensureDocumentSummary(params: {
     forwardProxy: params.forwardProxy,
     getBlockKramdown: params.getBlockKramdown,
     getChildBlocks: params.getChildBlocks,
+    getBlockType: params.getBlockType,
     force: params.force,
     updatedAt: params.updatedAt,
   })
