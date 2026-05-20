@@ -53,6 +53,7 @@ export function createAnalyticsDocumentIndexController(params: {
         indexStore: params.aiIndexStore,
         forwardProxy: params.forwardProxy,
         getBlockKramdown: params.getBlockKramdown,
+        getChildBlocks: params.getChildBlocks,
         force: true,
       })
       params.notify(t('analytics.controller.docIndexGenerated'), 2000)

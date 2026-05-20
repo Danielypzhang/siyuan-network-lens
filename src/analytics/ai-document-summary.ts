@@ -20,6 +20,8 @@ type ForwardProxyFn = (
 
 type GetBlockKramdownFn = (id: string) => Promise<{ id: string, kramdown: string }>
 
+type GetChildBlocksFn = (id: string) => Promise<Array<{ id: string, type?: string, subtype?: string }>>
+
 type AiConfig = Pick<
   PluginConfig,
   | 'aiBaseUrl'
@@ -89,6 +91,7 @@ export async function ensureDocumentIndex(params: {
   indexStore: Pick<AiDocumentIndexStore, 'getFreshDocumentProfile' | 'saveDocumentIndex'>
   forwardProxy: ForwardProxyFn
   getBlockKramdown: GetBlockKramdownFn
+  getChildBlocks: GetChildBlocksFn
   force?: boolean
   updatedAt?: string
 }): Promise<{ fromCache: boolean, updatedAt: string }> {
@@ -113,6 +116,7 @@ export async function ensureDocumentIndex(params: {
   const sourceBlocks = await collectDocumentSourceBlocks({
     documentId: params.sourceDocument.id,
     getBlockKramdown: params.getBlockKramdown,
+    getChildBlocks: params.getChildBlocks,
   })
 
   const result = await requestEvidenceCompilation({
@@ -142,6 +146,7 @@ export async function ensureDocumentSummary(params: {
   indexStore?: Pick<AiDocumentIndexStore, 'getFreshDocumentSummary' | 'saveDocumentIndex'> | null
   forwardProxy?: ForwardProxyFn
   getBlockKramdown?: GetBlockKramdownFn
+  getChildBlocks?: GetChildBlocksFn
   force?: boolean
   updatedAt?: string
 }): Promise<EnsuredDocumentSummaryResult> {
@@ -154,7 +159,7 @@ export async function ensureDocumentSummary(params: {
     return { ...freshSummary, fromCache: true }
   }
 
-  if (!params.forwardProxy || !params.getBlockKramdown) {
+  if (!params.forwardProxy || !params.getBlockKramdown || !params.getChildBlocks) {
     throw new Error(t('analytics.docSummary.aiRequired'))
   }
 
@@ -164,6 +169,7 @@ export async function ensureDocumentSummary(params: {
     indexStore: params.indexStore!,
     forwardProxy: params.forwardProxy,
     getBlockKramdown: params.getBlockKramdown,
+    getChildBlocks: params.getChildBlocks,
     force: params.force,
     updatedAt: params.updatedAt,
   })

@@ -1,0 +1,8 @@
+- [ ] `collectDocumentSourceBlocks` 递归获取文档所有子块的 kramdown 内容
+- [ ] 子块递归深度限制为 3 层
+- [ ] 子块获取失败时不中断整个流程
+- [ ] 文档无子块时行为与当前一致
+- [ ] 所有调用方正确传递 `getChildBlocks` 回调
+- [ ] `document-index-source-blocks.test.ts` 测试全部通过
+- [ ] 全部 wiki 相关测试通过
+- [ ] 生产构建成功

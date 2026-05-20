@@ -184,6 +184,7 @@ export function createAnalyticsWikiActionsController(params: {
         aiIndexStore: params.aiIndexStore,
         forwardProxy: params.forwardProxy,
         getBlockKramdown: params.getBlockKramdown,
+        getChildBlocks: params.getChildBlocks,
         generatedAt,
       })
       const sourceProfileMap = sourceProfileResult.profileMap
