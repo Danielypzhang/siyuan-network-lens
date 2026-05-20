@@ -11,6 +11,7 @@ type OpenDocumentFn = (documentId: string) => void
 type CreateDocWithMdFn = (notebook: string, path: string, markdown: string) => Promise<string>
 type GetChildBlocksFn = (id: string) => Promise<Array<{ id: string, type?: string, subtype?: string }>>
 type GetBlockKramdownFn = (id: string) => Promise<{ id: string, kramdown: string }>
+type GetBlockTypeFn = (id: string) => Promise<string | undefined>
 type ForwardProxyFn = (
   url: string,
   method?: string,
@@ -30,6 +31,7 @@ export function createAnalyticsDocumentIndexController(params: {
   forwardProxy?: ForwardProxyFn
   getChildBlocks: GetChildBlocksFn
   getBlockKramdown: GetBlockKramdownFn
+  getBlockType?: GetBlockTypeFn
   createDocWithMd?: CreateDocWithMdFn
   notify: ShowMessageFn
   openDocument: OpenDocumentFn
@@ -54,6 +56,7 @@ export function createAnalyticsDocumentIndexController(params: {
         forwardProxy: params.forwardProxy,
         getBlockKramdown: params.getBlockKramdown,
         getChildBlocks: params.getChildBlocks,
+        getBlockType: params.getBlockType,
         force: true,
       })
       params.notify(t('analytics.controller.docIndexGenerated'), 2000)

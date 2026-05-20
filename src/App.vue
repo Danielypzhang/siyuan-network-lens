@@ -306,7 +306,7 @@ import { pickOppositePluginText, pickPluginText } from '@/i18n/plugin'
 import { useAnalyticsState } from '@/composables/use-analytics'
 import { createAppWikiPanelController } from '@/composables/use-app-wiki-panel'
 import { createAppFilterController } from '@/composables/use-app-filters'
-import { appendBlock, createDocWithMd, deleteBlock, forwardProxy, getBlockAttrs, getBlockKramdown, getChildBlocks, getIDsByHPath, prependBlock, setBlockAttrs, updateBlock } from '@/api'
+import { appendBlock, createDocWithMd, deleteBlock, forwardProxy, getBlockAttrs, getBlockByID, getBlockKramdown, getChildBlocks, getIDsByHPath, prependBlock, setBlockAttrs, updateBlock } from '@/api'
 import { isAlphaSettingVisible, isAlphaSummaryCardVisible } from '@/plugin/alpha-feature-config'
 import { t } from '@/i18n/ui'
 import { DEFAULT_WIKI_CONTAINER_PATH, ensureConfigDefaults, type PluginConfig } from '@/types/config'
@@ -338,6 +338,7 @@ const analytics = useAnalyticsState({
   getIDsByHPath,
   getChildBlocks,
   getBlockKramdown,
+  getBlockType: async (id: string) => (await getBlockByID(id))?.type,
   getBlockAttrs,
   setBlockAttrs,
   forwardProxy,

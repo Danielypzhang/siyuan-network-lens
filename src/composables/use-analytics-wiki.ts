@@ -20,6 +20,7 @@ import type { PluginConfig } from '@/types/config'
 type GetIDsByHPathFn = (notebook: string, path: string) => Promise<string[]>
 type GetBlockKramdownFn = (id: string) => Promise<{ id: string, kramdown: string }>
 type GetChildBlocksFn = (id: string) => Promise<Array<{ id: string, type?: string, subtype?: string }>>
+type GetBlockTypeFn = (id: string) => Promise<string | undefined>
 
 export interface WikiPreviewThemePageItem {
   pageId?: string
@@ -119,6 +120,7 @@ export async function buildWikiSourceProfileMap(params: {
   forwardProxy?: (url: string, method?: string, payload?: any, headers?: any[], timeout?: number, contentType?: string) => Promise<IResForwardProxy>
   getBlockKramdown?: GetBlockKramdownFn
   getChildBlocks?: GetChildBlocksFn
+  getBlockType?: GetBlockTypeFn
   generatedAt: string
 }) {
   if (!params.aiIndexStore || !params.forwardProxy || !params.getBlockKramdown || !params.getChildBlocks) {
@@ -140,6 +142,7 @@ export async function buildWikiSourceProfileMap(params: {
           forwardProxy: params.forwardProxy,
           getBlockKramdown: params.getBlockKramdown,
           getChildBlocks: params.getChildBlocks,
+          getBlockType: params.getBlockType,
           updatedAt: params.generatedAt,
           force: attempt > 0,
         })

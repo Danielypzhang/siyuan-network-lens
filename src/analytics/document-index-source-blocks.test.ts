@@ -94,7 +94,34 @@ describe('classifySourceBlocks', () => {
 })
 
 describe('collectDocumentSourceBlocks', () => {
-  it('collects and classifies blocks from child blocks', async () => {
+  it('uses root kramdown directly for document blocks', async () => {
+    const longContent = 'This is a document block with enough content to be considered a primary source block for the AI indexing pipeline.'
+    const result = await collectDocumentSourceBlocks({
+      documentId: 'doc-1',
+      getBlockKramdown: async (id) => ({ id, kramdown: longContent }),
+      getChildBlocks: async () => [],
+      getBlockType: async () => 'd',
+    })
+
+    expect(result.primary).toHaveLength(1)
+    expect(result.primary[0].blockId).toBe('doc-1')
+    expect(result.primary[0].text).toBe(longContent)
+  })
+
+  it('uses root kramdown directly for paragraph blocks', async () => {
+    const longContent = 'This is a paragraph block with enough content to be considered a primary source block for the AI indexing pipeline.'
+    const result = await collectDocumentSourceBlocks({
+      documentId: 'para-1',
+      getBlockKramdown: async (id) => ({ id, kramdown: longContent }),
+      getChildBlocks: async () => [],
+      getBlockType: async () => 'p',
+    })
+
+    expect(result.primary).toHaveLength(1)
+    expect(result.primary[0].blockId).toBe('para-1')
+  })
+
+  it('fetches child blocks for heading blocks', async () => {
     const childBlocks = [
       { id: 'b1', type: 'p' },
       { id: 'b2', type: 'h2' },
@@ -102,20 +129,54 @@ describe('collectDocumentSourceBlocks', () => {
       { id: 'b4', type: 'p' },
     ]
     const kramdownMap: Record<string, string> = {
+      'heading-1': 'Short heading',
       b1: 'This is a long enough paragraph about AI indexing with meaningful content for classification.',
       b3: 'Short note.',
       b4: 'Another substantial paragraph discussing the implications of knowledge graphs in personal note-taking systems.',
     }
 
     const result = await collectDocumentSourceBlocks({
-      documentId: 'doc-1',
+      documentId: 'heading-1',
       getChildBlocks: async () => childBlocks,
       getBlockKramdown: async (id) => ({ id, kramdown: kramdownMap[id] || '' }),
+      getBlockType: async () => 'h',
     })
 
-    // b2 (h2) is filtered by LOW_VALUE_TYPES, b3 is too short
     expect(result.primary.length + result.secondary.length).toBeGreaterThanOrEqual(1)
     expect(result.primary.some(b => b.blockId === 'b1') || result.secondary.some(b => b.blockId === 'b1')).toBe(true)
+  })
+
+  it('fetches child blocks for list blocks', async () => {
+    const childBlocks = [
+      { id: 'l1', type: 'p' },
+      { id: 'l2', type: 'p' },
+    ]
+    const kramdownMap: Record<string, string> = {
+      'list-1': '- item',
+      l1: 'First list item content that is long enough to pass the threshold for classification.',
+      l2: 'Second list item content that is also long enough to pass the threshold for classification.',
+    }
+
+    const result = await collectDocumentSourceBlocks({
+      documentId: 'list-1',
+      getChildBlocks: async () => childBlocks,
+      getBlockKramdown: async (id) => ({ id, kramdown: kramdownMap[id] || '' }),
+      getBlockType: async () => 'l',
+    })
+
+    expect(result.primary.length + result.secondary.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('falls back to text length heuristic when getBlockType is unavailable', async () => {
+    const longContent = 'This is a document block with enough content to be considered a primary source block for the AI indexing pipeline.'
+    const result = await collectDocumentSourceBlocks({
+      documentId: 'doc-1',
+      getBlockKramdown: async (id) => ({ id, kramdown: longContent }),
+      getChildBlocks: async () => [],
+    })
+
+    expect(result.primary).toHaveLength(1)
+    expect(result.primary[0].blockId).toBe('doc-1')
   })
 
   it('handles blocks that fail to load gracefully', async () => {
@@ -125,14 +186,28 @@ describe('collectDocumentSourceBlocks', () => {
     ]
 
     const result = await collectDocumentSourceBlocks({
-      documentId: 'doc-1',
+      documentId: 'heading-1',
       getChildBlocks: async () => childBlocks,
       getBlockKramdown: async (id) => {
         if (id === 'fail') throw new Error('API error')
+        if (id === 'heading-1') return { id, kramdown: 'Short heading' }
         return { id, kramdown: 'This is a valid paragraph with enough content for classification.' }
       },
+      getBlockType: async () => 'h',
     })
 
     expect(result.primary.length + result.secondary.length).toBe(1)
+  })
+
+  it('returns empty when heading block has no children with sufficient content', async () => {
+    const result = await collectDocumentSourceBlocks({
+      documentId: 'heading-1',
+      getChildBlocks: async () => [],
+      getBlockKramdown: async (id) => ({ id, kramdown: 'Short' }),
+      getBlockType: async () => 'h',
+    })
+
+    expect(result.primary).toHaveLength(0)
+    expect(result.secondary).toHaveLength(0)
   })
 })

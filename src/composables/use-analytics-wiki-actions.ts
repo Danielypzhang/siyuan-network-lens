@@ -51,6 +51,7 @@ type CreateDocWithMdFn = (notebook: string, path: string, markdown: string) => P
 type GetIDsByHPathFn = (notebook: string, path: string) => Promise<string[]>
 type GetChildBlocksFn = (id: string) => Promise<Array<{ id: string, type?: string, subtype?: string }>>
 type GetBlockKramdownFn = (id: string) => Promise<{ id: string, kramdown: string }>
+type GetBlockTypeFn = (id: string) => Promise<string | undefined>
 type GetBlockAttrsFn = (id: string) => Promise<{ [key: string]: string }>
 type SetBlockAttrsFn = (id: string, attrs: { [key: string]: string }) => Promise<any>
 type HttpHeader = { [key: string]: string }
@@ -88,6 +89,7 @@ export function createAnalyticsWikiActionsController(params: {
   forwardProxy?: ForwardProxyFn
   getChildBlocks: GetChildBlocksFn
   getBlockKramdown: GetBlockKramdownFn
+  getBlockType?: GetBlockTypeFn
   createDocWithMd?: CreateDocWithMdFn
   getIDsByHPath?: GetIDsByHPathFn
   prependBlock: BlockWriteFn
@@ -185,6 +187,7 @@ export function createAnalyticsWikiActionsController(params: {
         forwardProxy: params.forwardProxy,
         getBlockKramdown: params.getBlockKramdown,
         getChildBlocks: params.getChildBlocks,
+        getBlockType: params.getBlockType,
         generatedAt,
       })
       const sourceProfileMap = sourceProfileResult.profileMap

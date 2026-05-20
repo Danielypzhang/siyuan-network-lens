@@ -116,6 +116,7 @@ type CreateDocWithMdFn = (notebook: string, path: string, markdown: string) => P
 type GetIDsByHPathFn = (notebook: string, path: string) => Promise<string[]>
 type GetChildBlocksFn = (id: string) => Promise<Array<{ id: string, type?: string }>>
 type GetBlockKramdownFn = (id: string) => Promise<{ id: string, kramdown: string }>
+type GetBlockTypeFn = (id: string) => Promise<string | undefined>
 type GetBlockAttrsFn = (id: string) => Promise<{ [key: string]: string }>
 type SetBlockAttrsFn = (id: string, attrs: { [key: string]: string }) => Promise<any>
 type ForwardProxyFn = (
@@ -144,6 +145,7 @@ type UseAnalyticsParams = {
   getIDsByHPath?: GetIDsByHPathFn
   getChildBlocks: GetChildBlocksFn
   getBlockKramdown: GetBlockKramdownFn
+  getBlockType?: GetBlockTypeFn
   getBlockAttrs?: GetBlockAttrsFn
   setBlockAttrs?: SetBlockAttrsFn
   forwardProxy?: ForwardProxyFn
@@ -188,6 +190,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
   const getIDsByHPath = params.getIDsByHPath
   const getChildBlocks = params.getChildBlocks
   const getBlockKramdown = params.getBlockKramdown
+  const getBlockType = params.getBlockType
   const getBlockAttrs = params.getBlockAttrs
   const setBlockAttrs = params.setBlockAttrs
   const pluginLogger = createPluginLogger(() => params.config.enableConsoleLogging === true)
@@ -613,6 +616,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
     forwardProxy: params.forwardProxy,
     getChildBlocks,
     getBlockKramdown,
+    getBlockType,
     createDocWithMd,
     getIDsByHPath,
     prependBlock,
@@ -638,6 +642,7 @@ export function useAnalyticsState(params: UseAnalyticsParams) {
     forwardProxy: params.forwardProxy,
     getChildBlocks,
     getBlockKramdown,
+    getBlockType,
     createDocWithMd,
     notify,
     openDocument,
